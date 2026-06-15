@@ -5,6 +5,7 @@ export default class Camera {
     public app: App;
     public instance: THREE.OrthographicCamera;
     public targetPosition: THREE.Vector3;
+    public offset: THREE.Vector3;
 
     constructor(app: App) {
         this.app = app;
@@ -23,9 +24,10 @@ export default class Camera {
         );
 
         this.targetPosition = new THREE.Vector3(0, 0, 0);
+        this.offset = new THREE.Vector3(20, 20, 20); // Fixed isometric offset
 
-        // Initial isometric offset +10 on X, Y, Z
-        this.instance.position.set(10, 10, 10);
+        // Initial isometric offset +20 on X, Y, Z
+        this.instance.position.copy(this.targetPosition).add(this.offset);
         this.instance.lookAt(this.targetPosition);
         
         this.app.scene.add(this.instance);
@@ -45,6 +47,20 @@ export default class Camera {
         this.instance.bottom = frustumSize / -2;
         
         this.instance.updateProjectionMatrix();
+    }
+
+    public updateFollow(target: THREE.Vector3, deltaTime: number): void {
+        // Smoothly lerp the target position towards the boat
+        this.targetPosition.lerp(target, 5 * deltaTime);
+        
+        // Calculate desired camera position by adding offset
+        const desiredPosition = this.targetPosition.clone().add(this.offset);
+        
+        // Smoothly lerp camera position
+        this.instance.position.lerp(desiredPosition, 5 * deltaTime);
+        
+        // Keep camera looking at the interpolated target
+        this.instance.lookAt(this.targetPosition);
     }
 
     public update(): void {

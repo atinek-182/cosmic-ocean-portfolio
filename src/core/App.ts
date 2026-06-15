@@ -7,6 +7,7 @@ import ContentManager from './ContentManager';
 import UIManager from './UIManager';
 import { AppState } from './AppState';
 import FeatureFlags from './FeatureFlags';
+import World from '../world/World';
 
 export default class App {
     public canvas: HTMLCanvasElement;
@@ -19,6 +20,7 @@ export default class App {
     public content: ContentManager;
     public ui!: UIManager;
     public flags!: FeatureFlags;
+    public world!: World;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -44,7 +46,10 @@ export default class App {
             // 4. Create UIManager
             this.ui = new UIManager(this);
             
-            // 5. Show Landing Screen
+            // 5. Initialize World
+            this.world = new World(this);
+            
+            // 6. Show Landing Screen
             this.ui.showLandingScreen();
 
             // Start loop only after UI is ready
@@ -68,7 +73,10 @@ export default class App {
             return;
         }
 
-        this.camera.update();
+        if (this.world) {
+            this.world.update();
+        }
+
         this.renderer.update();
     }
 }

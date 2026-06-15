@@ -1,0 +1,137 @@
+# Cosmic Ocean: V1 Development Roadmap
+
+*This production roadmap is designed specifically for a solo student developer learning Three.js. It prioritizes vertical slices, early playable builds, and recruiter-focused features over polish. Portfolio functionality must always outrank visual polish.*
+
+---
+
+## 🛑 Absolute Production Rules
+
+### 1. Vertical Slice Requirement
+By the end of Week 2, the following **must** work end-to-end:
+*   Boat movement
+*   One Project Monolith
+*   One Modal
+*   One Starlight Fragment
+*   Resume Mode
+*   Harbor Trigger
+
+*No additional features may be developed until the Vertical Slice is complete. This prevents spending weeks on systems that never integrate.*
+
+### 2. Scope Freeze Rule
+After Week 2:
+*   No new regions
+*   No new mechanics
+*   No new collectibles
+*   No new narrative systems
+
+*Only bug fixes, optimization, polish, and content additions (via JSON) are permitted.*
+
+### 3. Kill Switches
+Every risky feature needs a fallback. If a feature threatens the launch timeline:
+*   **If Ocean Shader causes performance issues:** Fallback to `MeshStandardMaterial`.
+*   **If Whale Event causes delays:** Ship without Whale.
+*   **If Audio is unfinished:** Ship silent.
+
+---
+
+## 🏗️ Week 1: Foundation & Asset Production
+**Goal: Create the minimal playable core and lock all assets.**
+
+*   **Deliverables:**
+    *   Vite + TypeScript scaffold created.
+    *   Core Engine singletons (`App.ts`, `Time.ts`, `Sizes.ts`, `Camera.ts`, `Renderer.ts`) implemented with Dependency Injection.
+    *   All 3D assets modeled, downloaded, and optimized (Draco compression).
+    *   Static Ocean Plane and basic Boat mesh in the scene.
+*   **Testing Goals:** WebGL context successfully initializes without errors.
+*   **Performance Checkpoint:** Ensure empty scene + Boat runs at 60 FPS on desktop.
+*   **Mobile Optimization:** Setup CSS safe-area insets early.
+*   **Risks:** Spending too much time modeling islands. *Mitigation: Strict 1-week timebox. If an island isn't finished, kitbash it.*
+*   **Success Criteria:** A white box (or untextured) boat can move around a flat plane using WASD.
+
+---
+
+## 🌊 Week 2: The Vertical Slice (Recruiter First)
+**Goal: The portfolio must function as a Resume immediately.**
+
+*   **Deliverables:**
+    *   Implement **Resume Mode** DOM overlays (Landing Screen, Standard Resume, 2D Modals).
+    *   Implement `UIManager` and Event Emitter for pausing/resuming the 3D world.
+    *   Implement 2D Proximity Interaction System (Radial trigger zones).
+    *   Place all 5 Island regions (Hub, Archipelago, Monoliths, Reef, Harbor) at exact World Blueprint coordinates.
+*   **Testing Goals:** Recruiters can read the entire resume without touching the 3D canvas.
+*   **Performance Checkpoint:** Opening/closing modals must hit < 300ms transition budgets.
+*   **Mobile Optimization:** Verify Resume sidebar collapses into hamburger menu correctly.
+*   **Risks:** UI overlapping the canvas awkwardly. *Mitigation: Stick strictly to UI/UX Bible CSS design tokens.*
+*   **Success Criteria:** The Vertical Slice Requirement is fully achieved. The Scope Freeze goes into effect immediately after this milestone.
+
+---
+
+## 🎨 Week 3: Aesthetic Identity
+**Goal: Make it look like Cosmic Ocean.**
+
+*   **Deliverables:**
+    *   Implement Custom Ocean Shader (Gerstner waves, depth-based coloring).
+    *   Bake all Matcap textures and apply `MeshMatcapMaterial` to Islands.
+    *   Add Fog (`THREE.FogExp2`) to create the Information Gap.
+    *   Add Stardust Particles (`THREE.Points`) and Boat Light (`PointLight`).
+*   **Testing Goals:** Shader compiles correctly across different browsers (Chrome, Safari, Firefox).
+*   **Performance Checkpoint:** Draw calls must stay strictly under 100 per frame.
+*   **Mobile Optimization:** Implement the 128x128 -> 64x64 Ocean Geometry degradation script.
+*   **Risks:** Custom shader crushes mobile performance. *Mitigation: Profile early. Fallback to `MeshStandardMaterial` if necessary.*
+*   **Success Criteria:** The game looks exactly like the visual target, even if animations are missing.
+
+---
+
+## ⚙️ Week 4: Systems & Gameplay Loops
+**Goal: Complete the narrative journey and polish interactions.**
+
+*   **Deliverables:**
+    *   Starlight Fragment logic (collection, UI counter, tethering to boat).
+    *   Boat Wake particle emitter.
+    *   Lighthouse Ignition Sequence (Contact form reveal, Resume Download button).
+    *   Save System (`localStorage`).
+*   **Testing Goals:** A user can play from the Hub to the Harbor, collect fragments, and open the Contact form without a single console error.
+*   **Performance Checkpoint:** Ensure particle arrays are pooled or properly garbage collected.
+*   **Mobile Optimization:** Implement virtual joystick for touch controls.
+*   **Risks:** Complex state bugs (collecting the same fragment twice). *Mitigation: Rely heavily on centralized event systems.*
+*   **Success Criteria:** The core game loop (Sail -> Read -> Collect -> Deliver) is fully functional.
+
+---
+
+## 🐋 Week 5: Cinematic Polish & Deployment
+**Goal: The "WOW" factor and shipping.**
+
+*   **Deliverables:**
+    *   Implement the **Cosmic Whale Breach** (`GSAP` spline animation).
+    *   Integrate `Howler.js` for Ocean Ambience and SFX (Whale splash, modal pops).
+    *   Integrate Analytics Events (Google Analytics or PostHog).
+    *   Setup `Promise.all()` initial loading screen.
+    *   Setup Vercel/Netlify CI/CD pipeline.
+*   **Testing Goals:** Analytics events fire correctly in the Network tab.
+*   **Performance Checkpoint:** Audio loading doesn't block the main thread.
+*   **Deployment Tasks:** 
+    *   Ensure all `.glb` assets are properly compressed.
+    *   Minify JS/CSS bundles.
+*   **Risks:** Audio autoplay policies blocking sound. *Mitigation: Tie audio context initialization to the "Explore Experience" Landing Screen button.*
+*   **Success Criteria:** A fully polished, deployed build accessible via a public URL.
+
+---
+
+## 🛡️ Week 6: Buffer & Bug Hunt
+**Goal: Final QA and emergency overflow.**
+
+*   **Deliverables:**
+    *   Fix clipping geometry.
+    *   Refine Boat drag/acceleration math based on playtesting.
+    *   Add Error States (Loading failure retry button).
+*   **Launch Checklist:**
+    *   [ ] Verify WCAG AA Contrast on all text.
+    *   [ ] Verify full Keyboard Navigation (`Tab` and `Esc`).
+    *   [ ] Test on an iPhone, an Android, and a Desktop.
+    *   [ ] Verify Contact Form submits successfully.
+    *   [ ] Hard refresh the page to test `localStorage` persistence.
+    *   [ ] Post link to LinkedIn/Twitter.
+*   **Success Criteria:** Project is announced to the world.
+
+---
+*End of Development Roadmap*

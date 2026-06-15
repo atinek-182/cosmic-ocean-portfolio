@@ -1,0 +1,584 @@
+# Cosmic Ocean: Technical Architecture Document (V1)
+
+*This document defines the strict software engineering blueprint for Cosmic Ocean. It acts as the final bridge between the Game Design Document and the actual implementation of the Vite + TypeScript + Three.js stack.*
+
+---
+
+## 1. Repository Structure
+
+### 1.1 Rationale
+A complex WebGL application requires rigorous separation of concerns. If UI logic leaks into the render loop, performance degrades. We separate the core engine (rendering, loop, events) from the world logic (boat, islands, water) and the DOM logic (Resume Mode).
+
+### 1.2 Implementation Approach
+We will use Vite with TypeScript. The source directory will be strictly domain-driven.
+
+### 1.3 Folder Tree & Naming Conventions
+```text
+/src
+  /assets           # Static files (GLBs, audio, textures)
+    /models
+    /audio
+    /textures
+  /core             # Engine singletons (App, Time, Sizes, Input)
+  /world            # 3D Entities (Boat, Ocean, Island, Whale)
+  /shaders          # GLSL files (.vert, .frag)
+  /ui               # DOM manipulation (ResumeMode, Modals)
+  /utils            # Math helpers, event emitters
+  /styles           # CSS / SCSS
+  main.ts           # Entry point
+```
+*   **Classes:** PascalCase (e.g., `BoatController.ts`).
+*   **Instances/Utils:** camelCase (e.g., `mathUtils.ts`).
+*   **Assets:** snake_case (e.g., `island_hub.glb`).
+
+### 1.4 Risks & Mitigations
+*   **Risk:** Circular dependencies between the `World` and `UI` layers.
+*   **Mitigation:** Enforce a strict one-way data flow using the central Event System (e.g., `World` emits `onIslandApproached`, `UI` listens and updates the DOM).
+
+---
+
+## 2. Application Architecture
+
+### 2.1 Rationale
+Passing `renderer`, `scene`, and `camera` down through 15 levels of constructors (prop drilling) leads to unmaintainable spaghetti code. We need global access without global variable pollution.
+
+### 2.2 Implementation Approach
+We will implement an **Explicit Dependency Injection** pattern. A single `App.ts` class initializes the core systems and orchestrates them, passing references via constructor parameters. We do not use global singletons.
+
+### 2.3 Pseudocode
+```typescript
+class App {
+    canvas: HTMLCanvasElement;
+    scene: THREE.Scene;
+    camera: Camera;
+    renderer: Renderer;
+    time: Time;
+    sizes: Sizes;
+    world: World;
+
+    constructor(canvas: HTMLCanvasElement) {
+        this.canvas = canvas;
+        this.sizes = new Sizes();
+        this.time = new Time();
+        this.scene = new THREE.Scene();
+        
+        // Pass app instance via constructor injection
+        this.camera = new Camera(this);
+        this.renderer = new Renderer(this);
+        this.world = new World(this);
+
+        this.time.on('tick', () => this.update());
+    }
+
+    update() {
+        this.camera.update();
+        this.world.update();
+        this.renderer.update();
+    }
+}
+```
+
+### 2.4 Risks & Mitigations
+*   **Risk:** Deeply nested classes requiring too many constructor parameters.
+*   **Mitigation:** Keep the hierarchy flat. Only core systems need the root `App` reference.
+
+---
+
+## 3. Three.js Architecture
+
+### 3.1 Rationale
+To achieve the "AAA-feeling" miniature diorama aesthetic, we must hijack the standard WebGL render pipeline to inject post-processing (tilt-shift depth of field) while maintaining 60 FPS.
+
+### 3.2 Implementation Approach
+*   **Renderer:** `WebGLRenderer` with `antialias: true`, `outputColorSpace = SRGBColorSpace`, and `toneMapping = ACESFilmicToneMapping`.
+*   **Camera System:** An `OrthographicCamera` locked at an isometric angle (`x: 10, y: 10, z: 10` looking at `0,0,0`). It uses a `GSAP` lerp function to strictly follow the Boat's `X` and `Z` coordinates, keeping the boat centered.
+*   **Post-processing:** Standard Three.js rendering. We may add a subtle Bloom pass (`UnrealBloomPass`) if performance allows, but no Tilt-Shift depth of field in V1 to ensure maximum performance across all devices.
+*   **Lighting:** `AmbientLight` (low intensity) + a single `DirectionalLight` pointing from the moon. Real-time shadows are **DISABLED** to save draw calls. All shadows are baked into Matcaps.
+
+### 3.3 Pseudocode (Camera Follow)
+```typescript
+update() {
+    const boatPosition = this.app.world.boat.mesh.position;
+    
+    // Smooth interpolation (lerp)
+    this.targetPosition.x = THREE.MathUtils.lerp(this.targetPosition.x, boatPosition.x, 0.1);
+    this.targetPosition.z = THREE.MathUtils.lerp(this.targetPosition.z, boatPosition.z, 0.1);
+    
+    // Maintain isometric offset
+    this.instance.position.set(
+        this.targetPosition.x + 10,
+        10,
+        this.targetPosition.z + 10
+    );
+    this.instance.lookAt(this.targetPosition);
+}
+```
+
+### 3.4 Risks & Mitigations
+*   **Risk:** `UnrealBloomPass` can still be heavy on extremely old mobile devices.
+*   **Mitigation:** Listen to the `Sizes` class. If the device pixel ratio is high or frame rate drops, disable the Bloom pass.
+
+---
+
+## 4. World Architecture
+
+### 4.1 Rationale
+The world cannot be randomly placed. The spacing dictates the pacing of the emotional journey. If islands are too close, the ocean feels small. If too far, the recruiter gets bored.
+
+### 4.2 Implementation Approach
+We map the 5 core regions on a strict Euclidean grid. The starting Hub is `(0,0,0)`.
+
+### 4.3 Exact Coordinates & Distances
+*   **Hub Lagoon:** `(x: 0, z: 0)`
+*   **Tech Archipelago:** `(x: -80, z: 40)` (Approx 5 seconds sailing from Hub).
+*   **Project Monoliths:** `(x: 100, z: 120)` (Approx 8 seconds sailing from Hub).
+*   **Prototype Reef:** `(x: 150, z: -50)` (Off the critical path, rewarding exploration).
+*   **The Harbor:** `(x: 200, z: 300)` (The extreme north-east corner).
+*   **Secret Observatory:** `(x: -150, z: -150)` (Extreme south-west, hidden in fog).
+
+### 4.4 Fog Zones
+`scene.fog = new THREE.FogExp2('#0a0f24', 0.015)`. The fog density is high. Islands will only clip into view when the boat is approximately 40 units away, exploiting the "Information Gap".
+
+### 4.5 Risks & Mitigations
+*   **Risk:** Floating point precision errors at extreme coordinates.
+*   **Mitigation:** The world size is capped at 500x500 units. Precision errors in WebGL do not become noticeable until >10,000 units. We are completely safe.
+
+---
+
+## 5. Boat Controller System
+
+### 5.1 Rationale
+Using a rigid-body physics engine (Rapier) is overkill and introduces jitter. We need deterministic, smooth movement.
+
+### 5.2 Implementation Approach
+Pure kinematic math executed inside the `requestAnimationFrame` loop. The state tracks `velocity` and `rotation`.
+
+### 5.3 Pseudocode
+```typescript
+class BoatController {
+    speed = 0;
+    maxSpeed = 0.5;
+    acceleration = 0.02;
+    drag = 0.95; // Friction multiplier
+    rotationSpeed = 0.03;
+
+    constructor(private app: App) {}
+
+    update(delta: number) {
+        // Thrust
+        if (this.app.input.keys.up) {
+            this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
+        } else if (this.app.input.keys.down) {
+            this.speed = Math.max(this.speed - this.acceleration, -this.maxSpeed / 2);
+        }
+
+        // Apply Drag
+        this.speed *= this.drag;
+
+        // Rotation (Only allow turning if moving)
+        if (Math.abs(this.speed) > 0.01) {
+            const turnMultiplier = this.speed > 0 ? 1 : -1;
+            if (this.app.input.keys.left) this.mesh.rotation.y += this.rotationSpeed * turnMultiplier;
+            if (this.app.input.keys.right) this.mesh.rotation.y -= this.rotationSpeed * turnMultiplier;
+        }
+
+        // Apply Velocity to Position
+        this.mesh.position.x += Math.sin(this.mesh.rotation.y) * this.speed * delta;
+        this.mesh.position.z += Math.cos(this.mesh.rotation.y) * this.speed * delta;
+
+        // Visual Bobbing (Math.sin)
+        this.mesh.position.y = Math.sin(this.app.time.elapsed * 0.002) * 0.2;
+    }
+}
+```
+
+### 5.4 Risks & Mitigations
+*   **Risk:** Frame rate drops cause the boat to teleport or move at inconsistent speeds.
+*   **Mitigation:** Always multiply velocity translations by the `delta` time passed from the loop.
+
+---
+
+## 6. Ocean System
+
+### 6.1 Rationale
+A flat blue plane is boring. A fully simulated fluid dynamics engine will crash mobile browsers. We need a vertex shader that mimics waves mathematically.
+
+### 6.2 Implementation Approach
+A highly subdivided `THREE.PlaneGeometry` (128x128 segments on Desktop, 64x64 on Mobile) using a `THREE.ShaderMaterial`.
+
+### 6.3 Pseudocode (GLSL Shader Pipeline)
+**Vertex Shader (`ocean.vert`):**
+```glsl
+uniform float uTime;
+varying float vElevation;
+
+void main() {
+    vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+    
+    // Gerstner wave approximation
+    float elevation = sin(modelPosition.x * 0.2 + uTime * 1.5) * 0.5;
+    elevation += sin(modelPosition.z * 0.15 + uTime * 1.2) * 0.5;
+    
+    modelPosition.y += elevation;
+    vElevation = elevation;
+    
+    gl_Position = projectionMatrix * viewMatrix * modelPosition;
+}
+```
+**Fragment Shader (`ocean.frag`):**
+```glsl
+uniform vec3 uDepthColor;
+uniform vec3 uSurfaceColor;
+varying float vElevation;
+
+void main() {
+    // Mix color based on wave height
+    float mixStrength = (vElevation + 1.0) / 2.0;
+    vec3 color = mix(uDepthColor, uSurfaceColor, mixStrength);
+    gl_FragColor = vec4(color, 1.0);
+}
+```
+
+### 6.4 Risks & Mitigations
+*   **Risk:** Too many vertices can slow down old mobile phones.
+*   **Mitigation:** The geometry budget is strictly capped at 128x128 max, falling back to 64x64 on mobile.
+
+---
+
+## 7. Island System
+
+### 7.1 Rationale
+Loading a 20MB GLB file containing all 5 regions at once will cause a 10-second blank white screen, violating our "Zero Friction" FTUE (First Time User Experience) pillar.
+
+### 7.2 Implementation Approach
+**V1 Loading Strategy.** We will use `Promise.all()` to load all V1 assets during startup. The user is presented with a loading screen until all assets are ready, preventing them from interacting with a half-broken world.
+
+### 7.3 Pseudocode
+```typescript
+class IslandSystem {
+    constructor(private app: App) {}
+
+    async init() {
+        const models = ['island_hub.glb', 'archipelago.glb', 'monoliths.glb', 'reef.glb', 'harbor.glb'];
+        const loadPromises = models.map(file => this.loadModel(`/assets/models/${file}`));
+        
+        const chunks = await Promise.all(loadPromises);
+        
+        for (const chunk of chunks) {
+            chunk.matrixAutoUpdate = false;
+            chunk.updateMatrix();
+            this.app.scene.add(chunk);
+        }
+        
+        this.app.events.emit('loadingComplete');
+    }
+}
+```
+
+### 7.4 Risks & Mitigations
+*   **Risk:** Loading all assets synchronously increases initial load time.
+*   **Mitigation:** Profile first, optimize later. V1 contains only ~15 low-poly models heavily compressed with Draco. Complex background asset streaming is a premature optimization and is deferred to V2.
+
+---
+
+## 8. Interaction System
+
+### 8.1 Rationale
+We need to trigger HTML Modals (Resume Mode popups) when the boat gets near an island. Using 3D Raycasting against high-poly island meshes every frame is extremely expensive.
+
+### 8.2 Implementation Approach
+**2D Radial Proximity Detection.** We ignore the Y-axis entirely. We calculate the 2D distance (X and Z) between the Boat and an invisible "Trigger Point" placed at the center of each island.
+
+### 8.3 Pseudocode
+```typescript
+class InteractionSystem {
+    triggers = [
+        { id: 'project_1', x: 100, z: 120, radius: 15, active: false },
+        { id: 'harbor', x: 200, z: 300, radius: 20, active: false }
+    ];
+
+    constructor(private app: App) {}
+
+    update() {
+        const boatPos = this.app.world.boat.mesh.position;
+
+        for (const trigger of this.triggers) {
+            // Fast 2D distance check (Pythagorean theorem)
+            const dx = boatPos.x - trigger.x;
+            const dz = boatPos.z - trigger.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+
+            if (distance < trigger.radius && !trigger.active) {
+                trigger.active = true;
+                this.app.events.emit('openModal', trigger.id);
+            } else if (distance >= trigger.radius && trigger.active) {
+                trigger.active = false;
+                this.app.events.emit('closeModal', trigger.id);
+            }
+        }
+    }
+}
+```
+
+### 8.4 Risks & Mitigations
+*   **Risk:** The trigger radius is too small, and the user sails past without noticing.
+*   **Mitigation:** Add a visual indicator (a glowing ring on the water or a floating UI prompt) that scales up as the user approaches the radius edge.
+
+---
+
+## 9. Resume Mode Architecture
+
+### 9.1 Rationale
+A 3D portfolio is useless if an impatient recruiter leaves after 5 seconds. We must offer a 2D escape hatch instantly.
+
+### 9.2 Implementation Approach
+A React-style (or Vanilla JS with template literals) DOM overlay sitting on top of the `<canvas>`. Controlled by a global state toggle.
+
+### 9.3 Pseudocode
+```typescript
+class UIManager {
+    isResumeMode = false;
+    canvas = document.querySelector('canvas');
+    resumeUI = document.querySelector('#resume-overlay');
+
+    constructor(private app: App) {}
+
+    init() {
+        document.querySelector('#btn-resume').addEventListener('click', () => this.toggle());
+    }
+
+    toggle() {
+        this.isResumeMode = !this.isResumeMode;
+        
+        if (this.isResumeMode) {
+            // Pause 3D World (Saves Battery/CPU)
+            this.app.time.pause();
+            
+            // Show UI
+            this.resumeUI.classList.add('visible');
+            this.canvas.style.filter = 'blur(10px) brightness(0.3)';
+        } else {
+            // Resume 3D World
+            this.app.time.resume();
+            
+            // Hide UI
+            this.resumeUI.classList.remove('visible');
+            this.canvas.style.filter = 'none';
+        }
+    }
+}
+```
+
+### 9.4 Risks & Mitigations
+*   **Risk:** The 3D scene continues rendering in the background, causing the browser to freeze while the user reads the resume.
+*   **Mitigation:** Explicitly pause the `requestAnimationFrame` loop when `isResumeMode === true`.
+
+---
+
+## 10. Audio System
+
+### 10.1 Rationale
+Using raw HTML5 `<audio>` tags leads to overlapping, clipping, and auto-play policy failures.
+
+### 10.2 Implementation Approach
+We will use the **Howler.js** library to manage all audio. It uses the Web Audio API under the hood, allowing for spatial fading and seamless looping.
+
+### 10.3 Pseudocode
+```typescript
+import { Howl } from 'howler';
+
+class AudioSystem {
+    ambient: Howl;
+    
+    init() {
+        this.ambient = new Howl({
+            src: ['/assets/audio/ocean_ambient.mp3'],
+            loop: true,
+            volume: 0.5
+        });
+        
+        // Wait for first user interaction to bypass autoplay restrictions
+        window.addEventListener('click', () => {
+            if (!this.ambient.playing()) this.ambient.play();
+        }, { once: true });
+    }
+
+    fadeForWhale() {
+        this.ambient.fade(0.5, 0.0, 2000); // Fade out over 2 seconds
+        setTimeout(() => this.ambient.fade(0.0, 0.5, 3000), 10000); // Fade back in
+    }
+}
+```
+
+### 10.4 Risks & Mitigations
+*   **Risk:** Browsers block audio until the user interacts with the page.
+*   **Mitigation:** Tie the `Howler.play()` initialization to the "Click to Start" button on the loading screen.
+
+---
+
+## 11. Whale Event System
+
+### 11.1 Rationale
+The Cosmic Whale must feel cinematic, but we cannot afford a complex AI system or skeletal rigs. It must be hardcoded to perfection.
+
+### 11.2 Implementation Approach
+A state machine triggered when the boat crosses a specific `Z` coordinate boundary (e.g., leaving the Monoliths). We use `GSAP` to animate the static mesh along a bezier curve.
+
+### 11.3 Pseudocode
+```typescript
+import gsap from 'gsap';
+
+class WhaleSystem {
+    hasBreached = false;
+    mesh: THREE.Mesh; // Low-poly static whale mesh
+
+    constructor(private app: App) {}
+
+    update() {
+        if (this.hasBreached) return;
+
+        const boatZ = this.app.world.boat.mesh.position.z;
+        if (boatZ > 150) { // Deep water threshold
+            this.triggerBreach();
+        }
+    }
+
+    triggerBreach() {
+        this.hasBreached = true;
+        this.app.audio.fadeForWhale();
+
+        // Position whale directly under the boat
+        const boatPos = this.app.world.boat.mesh.position;
+        this.mesh.position.set(boatPos.x, -50, boatPos.z + 20);
+
+        // Cinematic GSAP arc
+        gsap.to(this.mesh.position, {
+            duration: 4,
+            y: 30, // Apex of the jump
+            z: boatPos.z + 80,
+            ease: "power2.out",
+            onComplete: () => {
+                // Crash back down
+                gsap.to(this.mesh.position, {
+                    duration: 3,
+                    y: -50,
+                    z: boatPos.z + 120,
+                    ease: "power2.in",
+                    onComplete: () => this.spawnSplashParticles()
+                });
+            }
+        });
+        
+        // Pitch rotation
+        gsap.to(this.mesh.rotation, {
+            duration: 7,
+            x: -Math.PI, // Full front-flip barrel roll
+            ease: "power1.inOut"
+        });
+    }
+}
+```
+
+### 11.4 Risks & Mitigations
+*   **Risk:** The whale jumps but the user is looking the wrong way.
+*   **Mitigation:** The isometric camera is locked. We explicitly code the whale to jump *in front* of the boat's current velocity vector.
+
+---
+
+## 12. Save System
+
+### 12.1 Rationale
+If the user refreshes the page or accidentally hits back, they shouldn't lose their Starlight Fragments or the unlocked Observatory timeline.
+
+### 12.2 Implementation Approach
+A lightweight State Manager syncing to `localStorage`.
+
+### 12.3 Pseudocode
+```typescript
+class SaveSystem {
+    state = {
+        fragmentsCollected: 0,
+        observatoryUnlocked: false,
+        projectsViewed: []
+    };
+
+    init() {
+        const saved = localStorage.getItem('cosmicOceanSave');
+        if (saved) this.state = JSON.parse(saved);
+    }
+
+    save() {
+        localStorage.setItem('cosmicOceanSave', JSON.stringify(this.state));
+    }
+
+    collectFragment(projectId: string) {
+        if (!this.state.projectsViewed.includes(projectId)) {
+            this.state.projectsViewed.push(projectId);
+            this.state.fragmentsCollected++;
+            this.save();
+        }
+    }
+}
+```
+
+### 12.4 Risks & Mitigations
+*   **Risk:** `localStorage` is wiped if the user clears their cache.
+*   **Mitigation:** Acceptable risk. This is a 5-minute portfolio, not a 40-hour RPG. No backend database required.
+
+---
+
+## 13. Performance Budget
+
+### 13.1 Rationale
+A portfolio that runs at 15 FPS will actively lose you job offers. We must enforce strict performance limits.
+
+### 13.2 Budgets
+*   **Target FPS:** 60 FPS on mid-tier desktop, 60 FPS on modern mobile (iPhone 12+).
+*   **Draw Calls:** strictly < 100 per frame.
+*   **Triangle Count:** < 150,000 total.
+*   **Textures:** Max 2048x2048 for baked atlases. Use WebP or KTX2 compression.
+*   **Lighting:** 0 dynamic lights casting shadows. 100% baked shadows via Matcaps.
+
+### 13.3 Implementation Approach
+We will use `three-custom-shader-material` to inject logic into standard materials without breaking them, and `GLTFJSX` or manual traversing to merge geometries (`BufferGeometryUtils.mergeGeometries`) for the islands to drastically reduce draw calls.
+
+---
+
+## 14. Mobile Optimization Strategy
+
+### 14.1 Rationale
+50%+ of recruiters will view the link on their phone via a LinkedIn message.
+
+### 14.2 Implementation Approach
+*   **Detection:** Detect `window.innerWidth < 768` or `navigator.userAgent`.
+*   **Degradation:**
+    *   Disable `EffectComposer` (Tilt-shift blur is too heavy for mobile GPUs).
+    *   Reduce Ocean Plane segments from 256x256 to 128x128.
+    *   Cap `pixelRatio` to `1.5` even on retina screens.
+*   **Controls:** Replace WASD with an on-screen virtual joystick (using `nipplejs` or a custom touch implementation).
+
+---
+
+## 15. Deployment Strategy
+
+### 15.1 Rationale
+We need global CDN caching so the 3D assets load instantly for recruiters in any country.
+
+### 15.2 Implementation Approach
+*   **Hosting:** Vercel or Netlify.
+*   **Asset Compression:** Use `gltf-pipeline` to apply **Draco Compression** to all `.glb` files before deployment. This shrinks a 10MB island down to 1MB.
+*   **CI/CD:** GitHub Actions to automatically run `npm run build` and compress assets on push to `main`.
+
+---
+
+## 16. Future Expansion Architecture
+
+### 16.1 Rationale
+V1 is small and focused, but the architecture must support scaling if the developer wants to add new case studies over the next 5 years.
+
+### 16.2 Implementation Approach
+*   **Data-Driven Projects:** The Monoliths are generated dynamically based on a `projects.json` file. Adding a new case study in 2028 simply involves adding a new JSON object with coordinates; the engine will automatically instance a new Monolith at that location.
+*   **Extensible Trigger System:** The 2D proximity array can scale infinitely without performance degradation.
+
+---
+*End of Technical Architecture Document*

@@ -1,0 +1,174 @@
+# Cosmic Ocean: UI/UX Bible (V1)
+
+*This document defines the strict visual design system, accessibility standards, and user experience rules for all 2D HTML/CSS overlays in Cosmic Ocean. It supersedes previous documents regarding UX pacing and control locks.*
+
+---
+
+## 1. Visual Design System
+
+The UI must feel premium, lightweight, and highly readable. We avoid excessive glassmorphism to ensure text clarity and rendering performance.
+
+### 1.1 Design Tokens
+
+These values are the single source of truth for the entire application, enabling rapid future redesigns.
+
+```css
+:root {
+  /* Colors */
+  --color-bg: #0A0F1D;
+  --color-text: #F0F4F8;
+  --color-accent: #00F0FF;
+  --color-success: #FF00E5;
+  --color-muted: #9BA4B5;
+  --color-border: #1E2638;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+```
+
+### 1.2 Typography
+We use a high-contrast sans-serif pairing that reads perfectly on all screen sizes.
+*   **Headings:** `Outfit` (Bold, geometric, modern).
+*   **Body & UI Text:** `Inter` (Highly legible, excellent for long-form case studies).
+*   **Monospace (Code blocks):** `Fira Code`.
+
+---
+
+## 2. Accessibility Standards (A11y)
+
+The portfolio must be flawless for recruiters utilizing accessibility tools.
+
+1.  **WCAG AA Contrast:** All text must meet a minimum `4.5:1` contrast ratio against backgrounds.
+2.  **Keyboard Navigation:** Every button, modal, and resume section must be fully navigable via the `Tab` key. Focus states must have a visible `2px solid #00F0FF` outline.
+3.  **Escape Key:** Pressing `Esc` must immediately close any active modal and return focus to the 3D canvas (or the Resume toggle).
+4.  **2D Independence:** The Resume Mode must be fully usable without ever clicking or interacting with the 3D world.
+5.  **Reduced Motion:** Listen for `@media (prefers-reduced-motion: reduce)`. If active:
+    *   Disable CSS transition durations.
+    *   Pause background ocean animations.
+    *   Instantly snap camera movements.
+
+---
+
+## 3. Resume Mode & Recruiter Experience
+
+*The Golden Rule: Recruiters should never be forced to sail for information.*
+
+### 3.1 The Landing Screen
+*   **Design:** A clean overlay upon initial load.
+*   **Options:** Two massive, clear primary buttons: `[ Explore 3D Experience ]` and `[ View Standard Resume ]`.
+*   **Fast Recruiter Route:** If they click View Standard Resume, the 3D canvas pauses, and the clean ATS-friendly HTML layout loads instantly.
+
+### 3.2 Resume Mode Layout
+*   **Structure:** A traditional, single-column scrollable container.
+*   **Sections:** Profile Summary -> Technical Skills -> Experience -> Projects -> Contact.
+*   **Speed:** Must be readable and actionable in under 5 seconds.
+*   **Navigation:** A sticky top nav or sidebar (on desktop) allowing instant jumping between sections.
+*   **ATS Friendliness:** Built with semantic HTML (`<h1>`, `<h2>`, `<ul>`, `<li>`) so screen readers and ATS parsers can scrape the text effortlessly.
+
+---
+
+## 4. Component Design
+
+### 4.1 Modal Rules
+To prevent overlapping states and UI bugs, the following rules are absolute:
+*   Only one modal may be open at a time.
+*   Opening a new modal closes the current modal.
+*   Background scrolling is disabled while a modal is open.
+*   Focus is trapped entirely inside the active modal.
+*   `Esc` always closes the active modal.
+
+### 4.2 Project Modal (Case Studies)
+*   **Layout:** Split pane on desktop (Image/Video on Left, Text on Right). Stacked on mobile.
+*   **Information Hierarchy:** 
+    1. Project Title
+    2. Tech Stack Tags (e.g., `React`, `Three.js`)
+    3. The Problem & Solution (2 short paragraphs max)
+*   **CTA Placement:** At the bottom of the modal text.
+    *   **Primary CTA:** `[ Live Demo ]` (Cyan Button)
+    *   **Secondary CTA:** `[ GitHub Repo ]` (Outline Button)
+
+### 4.3 Observatory Timeline Modal
+*   **Structure:** A vertical timeline (a line down the left side with connecting dots).
+*   **Visual Hierarchy:** Years are bold headings. Milestones are short, personal bullet points (e.g., "Wrote my first line of JS," "Failed my first interview").
+*   **Tone:** Authentic and personal.
+
+### 4.4 Contact Form
+*   **Fields:** Name (Required), Email (Required), Message (Required).
+*   **Validation:** Real-time inline validation (red text for errors below inputs).
+*   **Success State:** Upon submission, the form vanishes and is replaced by a large, cyan checkmark and a simple "Message Sent. I'll be in touch."
+
+### 4.5 Loading Screen
+*   **Design:** Pitch black background. A minimalist white loading bar or spinning geometric shape.
+*   **Text:** `Loading Cosmic Ocean... [XX]%`.
+*   **Requirement:** It must disappear the exact millisecond `Promise.all()` resolves.
+
+### 4.6 Error States
+*   **Loading Failure:** Show a clear `[ Retry ]` button centered on the screen.
+*   **Asset Failure:** Replace any missing 3D asset or image with a generic fallback placeholder; do not crash the application.
+*   **Network Failure (Analytics/Form):** Show an inline warning text (e.g., "Network error, please try again"). Never block the core Resume Mode or 3D view due to a network timeout.
+
+### 4.7 Lighthouse Completion State
+Currently, Harbor ends abruptly. To maximize conversion, the following sequence occurs after the Lighthouse is ignited:
+*   The **Contact Form** appears instantly.
+*   A massive **`[ Download Resume ]`** button appears alongside it.
+*   A **`[ Return To Ocean ]`** button appears to allow free-roam sailing.
+*   The Lighthouse beacon remains permanently lit for the rest of the session.
+
+---
+
+## 5. UI Performance Budget & Animation Guidelines
+
+The UI must never become heavy or drop frames.
+
+### 5.1 Performance Rules
+*   No animation duration longer than `300ms`.
+*   No CSS blur filter above `10px`.
+*   No nested scrolling containers (prevents scroll hijacking).
+*   Maximum of 3 active CSS transitions simultaneously.
+
+### 5.2 Animation Specs
+*   **Easing:** Use `cubic-bezier(0.25, 1, 0.5, 1)` (ease-out-quart) for modal entries.
+*   **Transitions:** Fade-in (`opacity`) and slight slide-up (`transform: translateY(10px)` to `0`).
+*   **Hover States:** Shift background color and slightly increase text brightness. No heavy scaling (`transform: scale()`) to avoid layout jitter.
+
+---
+
+## 6. Mobile Design Rules
+
+50% of traffic will be mobile. The UI must adapt perfectly.
+
+*   **Mobile Safe Areas:** Rely strictly on CSS environmental variables to prevent UI from overlapping with iOS notches or Android navigation bars:
+    ```css
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    ```
+*   **Touch Targets:** Minimum button height of `48px` to ensure fat-finger accuracy.
+*   **Typography Scaling:** Headings reduce in size on mobile (e.g., `h1` from `3rem` to `2rem`).
+*   **Layout Adjustments:** 
+    *   Project Modals become single column (scrollable vertically).
+    *   Resume Mode sidebar collapses into a sticky hamburger menu.
+    *   3D sailing controls switch to an invisible left-thumb virtual joystick.
+
+## 7. Analytics Events
+
+Recruiters rarely leave feedback. We must track behavior to measure success.
+
+*   `Resume Mode Opened`
+*   `Project Viewed` (Includes project ID)
+*   `GitHub Clicked`
+*   `Demo Clicked`
+*   `Observatory Found`
+*   `Contact Submitted`
+*   `Lighthouse Activated`
+
+---
+*End of UI/UX Bible*

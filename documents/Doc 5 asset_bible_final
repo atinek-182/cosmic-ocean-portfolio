@@ -1,0 +1,278 @@
+# Cosmic Ocean: The Asset Bible (V1)
+
+*This is a production document for Art Directors, Level Designers, and Environment Artists. It outlines every visual and auditory asset required to ship Cosmic Ocean V1, specifically tailored for a solo student developer with zero budget.*
+
+---
+
+## 1. Player Assets
+
+The boat is the user's avatar. It must contrast sharply against the dark ocean to ensure high visibility and immediate emotional connection.
+
+### Origami Boat
+*   **Purpose:** The central avatar the user controls.
+*   **Description:** A highly stylized, low-poly folded paper boat. Pure white or glowing cyan edges. 
+*   **Recruiter Psychology Impact:** Evokes childhood nostalgia and creativity. It feels fragile, making the vast ocean feel larger by contrast.
+*   **Estimated Modeling Difficulty:** Very Low (Basic extruded planes).
+*   **Estimated Time To Create:** 1 Hour.
+*   **Acquisition Strategy:** Should Be Custom Made (It is the defining icon of the portfolio).
+*   **Priority Level:** P0
+
+### Boat Light Source
+*   **Purpose:** To illuminate the immediate area around the boat.
+*   **Description:** A soft, spherical `PointLight` attached to the center of the boat, casting a gentle cyan glow on the dark water.
+*   **Estimated Time To Create:** 5 Minutes (Three.js primitive).
+*   **Priority Level:** P0
+
+### Boat Materials
+*   **Purpose:** To make the boat pop.
+*   **Description:** A simple `MeshBasicMaterial` (unlit) so it never falls into shadow. 
+
+---
+
+## 2. Ocean Assets
+
+The ocean is the canvas. It must look mesmerizing but remain computationally cheap.
+
+### Ocean Surface
+*   **Purpose:** The floor of the world.
+*   **Description:** A subdivided Plane geometry (128x128 segments for Desktop, 64x64 segments for Mobile).
+*   **Recruiter Psychology Impact:** A beautiful custom ocean instantly proves elite shader/math capabilities.
+*   **Estimated Modeling Difficulty:** Zero (Procedurally generated in Three.js).
+*   **Acquisition Strategy:** Procedurally Generated.
+*   **Priority Level:** P0
+
+### Ocean Shader & Colors
+*   **Purpose:** To create the "Cosmic" visual identity.
+*   **Description:** Deep Navy Blue `#0a0f24` transitioning to Bright Cyan `#00f0ff` at the peaks of the waves. Uses simple Gerstner wave math (sine/cosine) for vertex displacement.
+*   **Priority Level:** P0
+
+### Ocean Particles (Stardust)
+*   **Purpose:** To add depth and motion to the air.
+*   **Description:** Thousands of tiny `THREE.Points` slowly drifting upwards from the water, simulating bioluminescence.
+*   **Priority Level:** P1
+
+---
+
+## 3. Island Assets
+
+The islands are the "Resume Items." They must be visually distinct so the user builds a mental map.
+
+### 3.1 Hub Lagoon
+*   **Visual Identity:** Calm, welcoming, bright.
+*   **Landmark Design:** A gentle crescent-shaped sandbar with a single glowing tree.
+*   **Color Palette:** Teal, White Sand, Neon Pink flora.
+*   **Asset Requirements:** 1 Base Mesh, 1 Tree Mesh.
+*   **Priority Level:** P0
+
+### 3.2 Tech Archipelago
+*   **Visual Identity:** Structural, jagged, and geometric.
+*   **Landmark Design:** Massive floating crystals representing coding languages.
+*   **Color Palette:** Dark Obsidian with Neon Blue/Yellow internal glow.
+*   **Asset Requirements:** 3-5 Crystal Variations.
+*   **Priority Level:** P0
+
+### 3.3 Project Monoliths
+*   **Visual Identity:** Ancient, towering, imposing.
+*   **Landmark Design:** Massive brutalist pillars rising straight out of the deep ocean.
+*   **Color Palette:** Pitch Black with glowing cyan runes.
+*   **Asset Requirements:** 1 Highly detailed Monolith (Instanced).
+*   **Priority Level:** P0
+
+### 3.4 Prototype Reef
+*   **Visual Identity:** Chaotic, personal, asymmetrical.
+*   **Landmark Design:** Sunken, abstract geometry (shattered cubes, floating gears).
+*   **Color Palette:** Clashing Neons (Magenta, Lime Green).
+*   **Asset Requirements:** Kitbashed geometric primitives.
+*   **Priority Level:** P1
+
+### 3.5 The Harbor
+*   **Visual Identity:** Warm, safe, conclusive.
+*   **Landmark Design:** A wooden dock leading to the Great Lighthouse.
+*   **Color Palette:** Warm Wood, Golden Yellow lighting.
+*   **Asset Requirements:** 1 Dock Mesh, 1 Lighthouse Mesh.
+*   **Priority Level:** P0
+
+### 3.6 Secret Observatory
+*   **Visual Identity:** Hidden, mystical.
+*   **Landmark Design:** A dark grotto containing an ancient, golden telescope.
+*   **Color Palette:** Dark Purple, Gold.
+*   **Asset Requirements:** 1 Grotto Mesh, 1 Telescope Mesh.
+*   **Priority Level:** P1
+
+---
+
+## 4. Landmark Assets
+
+These are the visual icons of the portfolio.
+
+### The Great Lighthouse
+*   **Description:** A tall, stylized lighthouse. The lens at the top is shattered until the player collects the fragments.
+*   **Recruiter Psychology Impact:** Provides a massive visual anchor and a clear end-goal for the journey.
+*   **Estimated Modeling Difficulty:** Low (Cylinders and basic booleans).
+*   **Acquisition Strategy:** Should Be Custom Made.
+*   **Priority Level:** P0
+
+### Monolith Structures
+*   **Description:** Giant rectangular pillars. 
+*   **Estimated Modeling Difficulty:** Very Low.
+*   **Acquisition Strategy:** Custom Made (Procedurally textured).
+*   **Priority Level:** P0
+
+### Observatory Telescope
+*   **Description:** An ornate, golden telescope.
+*   **Estimated Modeling Difficulty:** Medium.
+*   **Acquisition Strategy:** Download Free / Kitbash (Do not waste hours modeling brass gears; download a free telescope from Sketchfab).
+*   **Priority Level:** P1
+
+---
+
+## 5. Wildlife Assets
+
+Wildlife breathes life into the world, but complex rigged animations will destroy a solo student's timeline.
+
+### What Stays for V1
+*   **Bioluminescent Boids (Fish/Fireflies):** 
+    *   **Description:** Simple glowing spheres/cones that use flocking algorithms to swim around the boat.
+    *   **Reason:** Zero modeling required. Procedurally generated particles. High visual impact.
+
+### What is Cut for V1
+*   **Jellyfish & Rays:** 
+    *   **Reason:** Rigging a jellyfish with trailing tentacles or animating a Manta Ray flap cycle requires complex vertex shaders or skeletal animations. This is a massive time sink. Cut entirely for V1. The ocean will feel alive purely through the Stardust particles and the Cosmic Whale.
+
+---
+
+## 6. Cosmic Whale
+
+This is the riskiest asset in the project. It must be carefully scoped to avoid derailing the timeline.
+
+*   **Shape Language:** A massive, sleek silhouette of a Humpback whale.
+*   **Scale:** At least 20x larger than the player's boat.
+*   **Animation Design:** **No Skeletal Rigging**. The whale mesh remains static. We will use `GSAP` to animate the mesh's position and rotation along a mathematical arc (spline) out of the water and back in. The lack of a tail-flap animation will be hidden by the sheer speed of the breach and the blinding glow.
+*   **Materials:** A dark blue glass material (`MeshPhysicalMaterial` with transmission) containing internal glowing points.
+*   **Particle Effects:** Massive burst of `THREE.Points` on exit and entry.
+*   **Estimated Modeling Difficulty:** Low (Block out the shape, smooth shade, do not sculpt details).
+*   **Acquisition Strategy:** Download Free (Grab a low-poly whale from Sketchfab, apply custom glowing glass material).
+*   **Priority Level:** P1
+
+---
+
+## 7. Collectibles
+
+*   **Starlight Fragments:**
+    *   **Description:** Small, glowing spherical orbs.
+    *   **Visual Effects:** Emits a soft, pulsing bloom effect.
+    *   **Collection Animation:** When the boat gets close, `GSAP` smoothly interpolates the orb's position to snap to the back of the boat.
+    *   **Tether System:** A simple `THREE.Line` or `Line2` connecting the back of the boat to the orbiting fragments.
+*   **Priority Level:** P0
+
+---
+
+## 8. Environment Assets
+
+A highly reusable modular kit is the key to fast level design.
+
+*   **Rocks:** 3 variations of low-poly, jagged rocks. Dark grey. Used to construct the base of islands and block off edges of the map.
+*   **Coral:** 2 variations of abstract, tubular coral for the Prototype Reef. Neon colors.
+*   **Crystals:** 1 basic hexagonal prism. Scaled and rotated heavily to create the Tech Archipelago.
+*   **Moon Fragments:** 2 massive, floating chunks of cratered rock.
+*   **Background Elements:** Cloud planes (simple 2D sprites with a soft alpha texture) placed at the horizon.
+*   **Acquisition Strategy:** Make in Blender (These take 2 minutes each to make. Keep them low-poly and simple).
+*   **Priority Level:** P0
+
+---
+
+## 9. Materials Bible
+
+To maintain performance, we will rely heavily on Baked Materials and Matcaps, completely avoiding complex PBR lighting calculations for static objects.
+
+*   **Water:** Custom GLSL `ShaderMaterial`. Handles vertex displacement (waves) and depth-based fragment coloring.
+*   **Crystal (Archipelago):** `MeshBasicMaterial` using additive blending. 
+*   **Stone/Wood/Rocks:** `MeshMatcapMaterial`. We will bake lighting and shadows directly into the Matcap textures. This allows the rocks to look highly detailed and perfectly lit while requiring zero real-time lights in the Three.js scene.
+*   **Glow Materials:** `MeshBasicMaterial` with color values pushed above 1.0 (e.g., `[2.0, 5.0, 10.0]`) to trigger the post-processing Bloom effect.
+*   **Observatory Materials:** Dark, baked Matcaps with subtle gold metallic accents.
+*   **Priority Level:** P0
+
+---
+
+## 10. VFX Bible
+
+VFX makes the world feel tactile. All effects must use the lightweight `THREE.Points` system.
+
+*   **Whale Splash:** A massive burst of 500 white particles exploding outward on the Y-axis using simple velocity math, slowly fading opacity to 0 over 2 seconds.
+*   **Boat Wake:** A continuous emitter dropping white particles at the boat's tail. Particles shrink over 1 second.
+*   **Fragment Collection:** A quick, 0.2-second flash of bright white light (`PointLight` intensity spike).
+*   **Lighthouse Ignition:** A massive, slow-moving volumetric light cone (`THREE.SpotLight` with volumetric scattering, or a fake cone geometry with an additive opacity gradient).
+*   **Priority Level:** P0 (Wake/Collection) / P1 (Whale/Lighthouse)
+
+---
+
+## 11. Animation Bible
+
+To ensure maximum performance and minimal student workload, we completely abandon skeletal rigging.
+
+*   **Boat Movement:** `requestAnimationFrame` kinematics mapping velocity to translation and rotation. The boat subtly bobs up and down using a sine wave.
+*   **Whale Breach:** A scripted `GSAP` animation along a Bezier curve.
+*   **Fragment Orbit:** Math-driven circular orbit (`Math.cos(time)`, `Math.sin(time)`) around the boat.
+*   **Lighthouse Activation:** `GSAP` rotation tween on the light cone.
+*   **UI Reveal Animations:** Standard CSS transforms (`translateY`, `opacity`) triggered by intersection observers or 3D proximity raycasts.
+*   **Priority Level:** P0
+
+---
+
+## 12. Audio Bible
+
+Audio provides 50% of the game feel. Use only royalty-free sources (Freesound.org, Kenney.nl).
+
+*   **Ocean Ambience:** A deep, low-frequency rumble mixed with soft wind. Looped seamlessly.
+*   **Boat Sounds:** Gentle water-slapping sound. The volume scales based on the boat's velocity.
+*   **Whale Moment:** The ambient track fades out over 3 seconds. The breach plays a massive, bass-heavy "whoosh/splash" sound, followed by a triumphant, ethereal synth chord.
+*   **Fragment Collection:** A crisp, high-pitched glockenspiel or bell chime.
+*   **Lighthouse Activation:** A low, mechanical hum followed by a resonant, echoing horn (like a distant ship).
+*   **Priority Level:** P1 (Audio should be the final layer added before launch).
+
+---
+
+## 13. Free Asset Acquisition Plan
+
+A solo student developer **must not** model everything from scratch.
+
+*   **Make in Blender (Custom):** Origami Boat, Monoliths, Islands base shapes, Crystals, Lighthouse. (Total modeling time: < 5 hours).
+*   **Download Free (Sketchfab/Poly Pizza):** The Cosmic Whale, The Observatory Telescope, complex Prototype Reef debris (gears, broken pillars).
+*   **Procedural Generation (Three.js):** Ocean Surface, Ocean Waves, Stardust Particles, Whale Splash, Boat Wake.
+*   **The Rule:** If an asset takes more than 30 minutes to model and UV unwrap, go download it for free.
+
+---
+
+## 14. Asset Production Priority
+
+Strict prioritization guarantees the portfolio ships.
+
+*   **P0 (Required for First Playable):** Ocean Plane, Boat Model, Boat Wake, Monoliths, Hub Lagoon base mesh, Resume Mode UI. (The game must be playable and functioning as a resume at P0).
+*   **P1 (Required for Beta):** Starlight Fragments, Lighthouse, Prototype Reef, Contact Form UI, The Cosmic Whale, Basic Audio.
+*   **P2 (Nice to Have):** Secret Observatory, Detailed Matcaps, Bioluminescent Boids, Polish VFX.
+*   **P3 (Future Updates):** Dynamic Skyboxes, Multiplayer, Advanced Physics. (Strictly cut from V1).
+
+---
+
+## 15. Asset Count Summary
+
+**Total Estimated V1 Assets:**
+*   **Models:** ~15 (Boat, 5 Islands, Lighthouse, Whale, Telescope, 6 Environment Rocks/Crystals).
+*   **Materials:** ~10 (Water Shader, 5 Baked Matcaps, Glow Material, Glass Material).
+*   **Animations:** 5 (All code-driven, 0 rigged).
+*   **VFX:** 4 (Particles).
+*   **Audio:** 5 tracks/SFX.
+
+**Realistic Solo Student Timeline:**
+*   **Asset Creation/Acquisition:** 1 Week.
+*   **Three.js Engine/Logic:** 2 Weeks.
+*   **HTML UI / Resume Mode:** 1 Week.
+*   **Polish & Optimization:** 1 Week.
+*   **Total V1 Production Time:** 5 Weeks.
+
+**Biggest Asset Risks:**
+1.  **Over-modeling:** Trying to make the islands highly detailed. They must remain stylized and low-poly to hit the 5-week deadline.
+2.  **Shader Performance:** The Custom Ocean shader must be tested on mobile early. If it lags, immediately fallback to a standard `MeshStandardMaterial` with normal maps.
+
+---
+*End of The Asset Bible*

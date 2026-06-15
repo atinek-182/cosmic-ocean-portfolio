@@ -1,0 +1,218 @@
+# Cosmic Ocean: Project Data Schema (V1)
+
+*This document serves as the single source of truth for all portfolio content, metadata, and analytics interactions in Cosmic Ocean. It guarantees that the 3D application logic is fully decoupled from the portfolio content, allowing future updates without modifying application code.*
+
+---
+
+## 1. Core Architecture Strategy
+
+### Single Source Of Truth
+All text, images, coordinates, and skills live inside a single `content.json` file. The TypeScript application contains zero hardcoded strings regarding the developer's experience.
+
+### Content Loading Strategy
+**Data Source:** `public/data/content.json`
+**Loading Phase:** The application fetches this JSON during the `Promise.all()` initialization step defined in the Technical Architecture Document. 
+**State Hydration:** The JSON is validated against the schemas below and injected into a global `ContentManager` class via constructor injection. The UI and 3D world dynamically generate DOM elements and interaction triggers based entirely on this state.
+
+---
+
+## 2. Versioning & Validation Strategy
+
+*   **Schema Versioning:** The root JSON object must contain a `buildInfo` object detailing the version.
+*   **Forward Compatibility:** All new fields added in future years (2027+) must be defined as `optional` (`?`) in the TypeScript interface.
+*   **Validation:** The schema is strictly validated on load. Any parsing failures populate the `validationErrors` array and disable the 3D scene, showing the error UI instead.
+
+---
+
+## 3. TypeScript Interfaces & JSON Schema
+
+### 3.1 Root Schema
+```typescript
+interface PortfolioData {
+    buildInfo: {
+        version: string; // e.g., "1.0.0"
+        buildDate: string; // ISO 8601
+        commitHash: string; // e.g., "7f8a9c2"
+    };
+    featureFlags: {
+        enableWhale: boolean;
+        enableAudio: boolean;
+        enableAnalytics: boolean;
+        enableObservatory: boolean;
+        enablePostProcessing: boolean;
+    };
+    assetManifest: {
+        modelPath: string; // Base URL for GLB models
+        audioPath: string; // Base URL for sound files
+        texturePath: string; // Base URL for matcaps
+        preloadPriority: string[]; // Array of essential asset filenames
+    };
+    developer: DeveloperSchema;
+    resume: ResumeSchema;
+    skills: SkillCategory[];
+    projects: ProjectSchema[];
+    observatoryTimeline: TimelineEvent[];
+    worldTriggers: WorldTriggerSchema[];
+    validationErrors?: string[]; // Populated internally for debugging bad JSON.
+}
+```
+
+### 3.2 Developer / Resume Schema
+```typescript
+interface DeveloperSchema {
+    name: string; // Required
+    role: string; // Required (e.g., "Creative Frontend Engineer")
+    email: string; // Required
+    github: string; // Required
+    linkedin: string; // Required
+    tagline?: string; // Optional
+}
+
+interface ResumeSchema {
+    summary: string[]; // Required. Array of paragraphs.
+    experience: JobExperience[]; // Required
+}
+
+interface JobExperience {
+    id: string; // Required. Unique identifier.
+    company: string; // Required
+    role: string; // Required
+    startDate: string; // Required (e.g., "2024-01")
+    endDate: string | "Present"; // Required
+    bullets: string[]; // Required
+}
+```
+
+### 3.3 Skills Schema
+```typescript
+interface SkillCategory {
+    categoryName: string; // Required (e.g., "Languages", "3D Web")
+    skills: Skill[]; // Required
+}
+
+interface Skill {
+    id: string; // Required. Unique identifier.
+    name: string; // Required (e.g., "TypeScript")
+    iconUrl?: string; // Optional path to SVG
+    level?: "Beginner" | "Intermediate" | "Advanced"; // Optional clarity for recruiters.
+}
+```
+
+### 3.4 Project Schema (The Monoliths)
+*Validation Rule: Every project must have a matching `worldTrigger` defined to spawn its monolith.*
+```typescript
+interface ProjectSchema {
+    id: string; // Required. (e.g., "project-alpha")
+    title: string; // Required
+    year: number; // Required
+    displayOrder: number; // Required. Controls UI list sorting.
+    thumbnailUrl: string; // Required. Relative path to /public/assets/images/
+    videoUrl?: string; // Optional fallback.
+    techStackIds: string[]; // Required. Must map to Skill.id
+    description: {
+        problem: string; // Required
+        solution: string; // Required
+    };
+    links: {
+        liveDemo?: string; // Optional
+        githubRepo?: string; // Optional
+        caseStudy?: string; // Optional external link
+    };
+}
+```
+
+### 3.5 Observatory Timeline Schema
+```typescript
+interface TimelineEvent {
+    year: number; // Required. Used for sorting.
+    title: string; // Required
+    description: string; // Required
+    isMajorMilestone: boolean; // Required. If true, renders larger in UI.
+}
+```
+
+### 3.6 World Trigger Schema
+*Decouples 3D spatial layout from content. Adding a new project in 2028 simply means adding a new object here.*
+```typescript
+interface WorldTriggerSchema {
+    id: string; // Required. Maps to Project.id or special landmarks ("harbor", "observatory").
+    type: "project" | "harbor" | "observatory" | "reef"; // Required
+    coordinates: {
+        x: number; // Required
+        z: number; // Required
+    };
+    triggerRadius: number; // Required
+}
+```
+
+---
+
+## 4. State & Save-Game Schema
+
+This schema defines what is saved to `localStorage`. It tracks player progression.
+```typescript
+interface SaveGameState {
+    fragmentsCollected: string[]; // Array of Project IDs whose fragments have been collected.
+    observatoryFound: boolean; // Has the player entered the Observatory trigger?
+    lighthouseIgnited: boolean; // Has the player delivered fragments to the Harbor?
+    hasViewedResume: boolean; // Analytics fallback
+}
+```
+
+---
+
+## 5. Analytics Event Schema
+
+Defines the exact structure of payloads sent to the analytics provider (e.g., PostHog/Google Analytics).
+
+```typescript
+type AnalyticsEventName = 
+    | "session_start"
+    | "resume_mode_opened"
+    | "project_viewed"
+    | "github_clicked"
+    | "demo_clicked"
+    | "observatory_found"
+    | "contact_submitted"
+    | "lighthouse_activated"
+    | "ocean_shader_fallback"; // Fires if the Kill-Switch is triggered
+
+interface AnalyticsPayload {
+    eventName: AnalyticsEventName;
+    timestamp: number;
+    metadata: {
+        projectId?: string; // Sent with "project_viewed" or "github_clicked"
+        timeInWorldMs?: number; // Time spent sailing before action
+        sessionDurationMs?: number; // Total analytics session duration tracking
+        isMobile?: boolean; // Injected by engine
+    };
+}
+```
+
+---
+
+## 6. Lighthouse Completion Schema
+
+When `SaveGameState.lighthouseIgnited` becomes `true`, the UI state machine activates this completion payload.
+```typescript
+interface LighthouseCompletionState {
+    formEnabled: boolean; // True. Unlocks the Contact Form UI.
+    resumeDownloadUrl: string; // Required. Path to the static PDF.
+    returnToOceanEnabled: boolean; // True. Shows the [Return To Ocean] CTA.
+    worldStateOverrides: {
+        ambientLightBoost: number; // e.g., +0.5 to brighten the dark ocean
+        fogDensityTarget: number; // e.g., 0.005 to reveal the horizon
+    };
+}
+```
+
+---
+
+## 7. Validation Rules
+Before the `ContentManager` accepts the JSON file during startup, it runs a lightweight validation pass:
+1.  **Orphan Check:** Every `techStackId` in a `ProjectSchema` must exist in the `SkillCategory` array.
+2.  **Trigger Check:** Every `ProjectSchema` must have exactly one corresponding `WorldTriggerSchema` with a matching `id`.
+3.  **Critical Path:** The data must contain at least `1` project, `1` harbor trigger, and `1` developer email. If any are missing, the application defaults to an **Error State** (Defined in UI/UX Bible) instructing the developer to fix their JSON.
+
+---
+*End of Project Data Schema*

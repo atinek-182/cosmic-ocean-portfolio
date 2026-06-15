@@ -1,0 +1,129 @@
+# Cosmic Ocean: World Layout Blueprint (V1)
+
+*This document serves as the absolute source of truth for the spatial layout of Cosmic Ocean. It converts the conceptual regions from the GDD and the architecture limits from the TAD into an exact, buildable coordinate system.*
+
+---
+
+## 1. Top-Down World Map
+
+The world exists on a strict Cartesian plane where `X` is West/East and `Z` is North/South. The Boat spawns facing North-East (towards the Monoliths).
+
+```text
+                            [NORTH: +Z]
+                                 |
+                                 |                (200, 300)
+                                 |              [THE HARBOR]
+                                 |                  /
+                                 |                /
+  ========================(WHALE BREACH Z=180)========================
+                                 |            /
+                                 |          /
+                                 |        /
+                                 |      /    (100, 120)
+                                 |   [PROJECT MONOLITHS]
+     (-80, 40)                   |           /
+ [TECH ARCHIPELAGO]              |         /
+             \                   |       /
+               \                 |     /
+                 \               |   /
+-(WEST: -X)--------\-------------+-(0,0)---------------------(EAST: +X)-
+                     \           | [HUB]
+                       \         |
+                         \       |               (150, -50)
+                           \     |            [PROTOTYPE REEF]
+                             \   |
+        (-150, -150)             |
+    [SECRET OBSERVATORY]         |
+                                 |
+                            [SOUTH: -Z]
+```
+
+---
+
+## 2. World & Camera Constraints
+
+### World Boundaries
+The game operates within a strictly enforced bounding box to prevent floating point precision errors and endless empty sailing.
+*   **Max X:** `250`
+*   **Min X:** `-250`
+*   **Max Z:** `350`
+*   **Min Z:** `-250`
+*   **Collision Action:** If the boat attempts to cross these boundaries, its velocity is smoothly clamped to 0, and a soft physical pushback is applied (an invisible wall).
+
+### Camera Boundaries
+The `OrthographicCamera` strictly follows the boat with an isometric offset (`+10, +10, +10`). The camera does not have independent limits; it is constrained entirely by the boat's world boundaries.
+
+### Atmospheric Visibility & Fog Ranges
+The "Information Gap" is controlled purely by `THREE.FogExp2`.
+*   **Fog Color:** Deep Navy (`#0a0f24`)
+*   **Fog Density:** `0.015`
+*   **Absolute Visibility Limit:** Objects completely disappear at ~`55 units` away from the camera.
+*   **Silhouette Range:** Objects begin to emerge as dark silhouettes at `30-45 units` away.
+
+### Ocean Depth Zones
+The Y-axis determines the vertical layering.
+*   **Ocean Surface (Water Plane):** `Y = 0`
+*   **Shallows (Hub, Reef):** Sand/Rock geometry sits just below the surface at `Y = -2 to -5`.
+*   **The Deep (Between Regions):** Empty space down to `Y = -100`. The Whale spawns at `Y = -50`.
+
+---
+
+## 3. Coordinate Dictionary & Scales
+
+| Region / Landmark | Coordinates (X, Z) | Dimensions (Radius) | Collision Zone | Starlight Fragments |
+| :--- | :--- | :--- | :--- | :--- |
+| **Spawn Point** | `(0, 0)` | `N/A` | `N/A` | `0` |
+| **Hub Lagoon** | `(0, -10)` | `20 units` | Radius `15` | `0` |
+| **Tech Archipelago** | `(-80, 40)` | `30 units` | Radius `25` | `0` |
+| **Project Monoliths** | `(100, 120)` | `40 units` | Radius `35` | `3` (One per Monolith) |
+| **Prototype Reef** | `(150, -50)` | `25 units` | Radius `20` | `0` |
+| **Secret Observatory**| `(-150, -150)` | `20 units` | Radius `18` | `0` |
+| **The Harbor** | `(200, 300)` | `35 units` | Radius `30` | `0` (Delivery Zone) |
+
+---
+
+## 4. Navigation & Sailing Times
+
+**Assumption:** Boat max speed = `30 units/sec` (at 60fps). 
+*We intentionally keep travel times short to respect the recruiter's time limit. All times are target ranges allowing for minor deviation.*
+
+### The Fast Recruiter Route (Critical Path)
+This is a guaranteed safe path ensuring recruiters hit the primary case studies without mandatory exploration.
+1.  **Hub to Archipelago:** Distance `89 units` -> **2–4 seconds** target sailing time.
+2.  **Archipelago to Monoliths:** Distance `197 units` -> **5–8 seconds** target sailing time. *(User hits the first project easily within the required 30 seconds).*
+3.  **Monoliths to Harbor:** Distance `205 units` -> **6–9 seconds** target sailing time.
+
+### The Optional Path (Exploration Route)
+1.  **Hub to Prototype Reef:** Distance `158 units` -> **4–7 seconds** target sailing time.
+2.  **Hub to Secret Observatory:** Distance `212 units` -> **6–9 seconds** target sailing time.
+
+*No single gap between regions exceeds a 10-second target of dead-water sailing, preserving dopamine loops while maintaining the illusion of a vast ocean.*
+
+---
+
+## 5. Corridors & Progression Flow
+
+### Safe Navigation Corridors
+The environment uses subtle lighting to guide the player (The "Bruno Simon" philosophy of breadcrumbs).
+*   **The Main Current:** A trail of soft, floating bioluminescent particles (`Y = 1`) forms a loose, curved path from the Hub -> Monoliths -> Harbor.
+*   **The Dark Zones:** The areas leading to the Observatory and Reef lack particle breadcrumbs. They are intentionally darker, requiring the player to brave the fog.
+
+### Starlight Fragment Locations
+The Fragments (glowing collectibles) are positioned exactly at the interactable trigger points of the three Project Monoliths.
+*   **Project Alpha:** `(90, 110)`
+*   **Project Beta:** `(100, 130)`
+*   **Project Gamma:** `(110, 115)`
+When the boat enters the `15 unit` trigger radius, the Resume Modal opens. Upon closing the modal, the fragment is attached to the boat.
+
+---
+
+## 6. Cinematic Triggers
+
+### The Whale Breach Event
+*   **Trigger Condition:** The boat crosses `Z = 180` (moving North toward the Harbor) AND has collected at least 1 Starlight Fragment.
+*   **Spawn Location:** The Whale instantiates directly underneath the boat `(Boat.X, -50, Boat.Z + 20)`.
+*   **Action:** The cinematic breach executes directly across the player's vector, guaranteeing it occurs on-screen without needing to steal camera control from the player.
+
+### The Lighthouse Ignition
+*   **Trigger Condition:** The boat enters the Harbor trigger radius `(200, 300)` with `> 0` fragments.
+*   **Action:** The player retains full control of the boat at all times (no forced locking). Fragments detach, fly up to `(200, 50, 310)`, and the volumetric light cone activates, triggering the final Contact form reveal without interrupting gameplay flow.

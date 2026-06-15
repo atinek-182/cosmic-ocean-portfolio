@@ -1,0 +1,487 @@
+# Exhaustive Technical Architecture Analysis
+
+## Chapter 1 → Architecture
+
+### What exists
+The portfolio is built on a custom, vanilla JavaScript architecture powered by Webpack (now easily translatable to Vite). At its core, the architecture relies on a centralized orchestrator pattern rather than a component-based framework (like React Three Fiber). The entry point is `src/javascript/Application.js`, which instantiates a series of single-purpose utility classes (`Sizes.js`, `Time.js`, `Resources.js`) and passes them down to the main `World` class (`src/javascript/World/index.js`). 
+
+### Why it exists
+This procedural, vanilla approach exists to guarantee absolute control over the initialization sequence and to eliminate the overhead of Virtual DOM reconciliation or framework-specific lifecycle hooks. When building highly interactive, physics-driven web experiences, squeezing every drop of performance from the main thread is paramount. Bruno designed this architecture to be deterministic: things load and execute exactly when he explicitly calls them.
+
+### How it works
+In `Application.js`, the constructor follows a strict, procedural setup phase:
+```javascript
+this.setConfig()
+this.setDebug()
+this.setRenderer()
+this.setCamera()
+this.setPasses()
+this.setWorld()
+```
+Global state and utilities are not imported as singletons; instead, they are instantiated in `Application.js` and explicitly passed down through `_options` objects into every subsequent class. For example, `Time.js` is an `EventEmitter` that runs a `requestAnimationFrame` loop. Any class that needs to execute logic per frame (like `Car.js` or `Physics.js`) receives the `time` instance and subscribes to its `tick` event: `this.time.on('tick', () => { ... })`.
+
+### Dependencies
+- **three.js**: The core WebGL engine.
+- **dat.gui**: Used extensively for debug tweaking (`this.setDebug()`).
+- **Custom Utilities**: `Time.js` (Delta time and RAF), `Sizes.js` (Viewport tracking and resize events), `EventEmitter.js` (Custom event bus).
+
+### Advantages
+- **Predictability**: The initialization flow is extremely easy to read. You know exactly what happens and in what order.
+- **Decoupled Loop**: By using `Time.js` as an event emitter, rendering logic in `Application.js` is completely decoupled from physics logic in `Physics.js`, yet both run synchronously on the same frame.
+- **Performance**: Zero framework overhead.
+
+### Disadvantages
+- **Constructor Prop Drilling**: Because global state is not managed by a Singleton or Context, classes have massive constructors. For instance, `Car.js` receives `time, resources, objects, physics, shadows, materials, controls, sounds, renderer, camera, debug, config`. This makes refactoring incredibly tedious.
+- **Monolithic Files**: Without a strict component architecture, files like `Physics.js` and `Controls.js` swell to hundreds of lines, mixing input mapping, rendering sync, and simulation math.
+
+### What we should reuse
+- **The Event-Driven Render Loop**: Reusing `Time.js` and `Sizes.js` to broadcast `tick` and `resize` events is a flawless pattern. It allows any independent module to subscribe to the render loop without modifying the root application file.
+- **The Centralized Application Orchestrator**: Having a single `App.ts` that acts as the entry point and explicitly boots up managers (`World`, `Physics`, `Audio`) is a pattern we should maintain.
+
+### What we should avoid
+- **Prop Drilling via Options**: For the Cosmic Ocean portfolio, we should avoid passing 10+ arguments into constructors. Instead, we should implement a Dependency Injection (DI) system or use Singleton service locators (e.g., `Service.get(Time)` or `Service.get(InputManager)`) so entities can fetch the globals they need without cluttering their constructors.
+
+---
+
+## Chapter 2 → Rendering Pipeline
+
+### What exists
+The portfolio bypasses the default Three.js `WebGLRenderer.render(scene, camera)` loop in favor of the `EffectComposer` pipeline. The rendering logic is defined in `Application.js` under `setPasses()`. It utilizes a standard `RenderPass`, followed by two custom ShaderPasses: `BlurPass` (separated into `horizontalBlurPass` and `verticalBlurPass`) and `GlowsPass`.
+
+### Why it exists
+The portfolio aims for a very specific "miniature toy" aesthetic. Standard real-time rendering looks flat. To achieve this diorama feel, a Depth of Field (DoF) effect is required. However, traditional DoF (which samples a depth buffer to calculate focal blur) is computationally disastrous for low-end mobile devices. The custom pipeline exists to fake this aesthetic efficiently, while the `GlowsPass` is used to create a warm, unified color grading over the scene.
+
+### How it works
+The `EffectComposer` renders the scene to a texture, which is then fed through custom GLSL shaders.
+- **The Faked Depth of Field (`src/shaders/blur/fragment.glsl`)**: Instead of a depth buffer, Bruno uses screen-space coordinates (`vUv.y`). 
+  ```glsl
+  float blurStrength = 1.0 - sin(vUv.y * M_PI);
+  gl_FragColor = mix(diffuseColor, blurColor, blurStrength);
+  ```
+  Since the camera is always locked in an isometric top-down view centered on the car, the center of the screen (`vUv.y = 0.5`) is always in focus (`sin(0.5 * π) = 1.0`, so `blurStrength = 0.0`). The top and bottom edges of the screen naturally ramp up to a blur strength of `1.0`. It is a mathematically perfect, virtually free tilt-shift effect.
+- **The Glow (`src/shaders/glows/fragment.glsl`)**: A radial gradient is drawn on the screen based on the distance from `vUv` to `uPosition`. It mixes the rendered scene with a solid `uColor` (usually `#ffcfe0` pink) multiplied by `uAlpha`, providing a soft vignette/color-grade.
+
+### Dependencies
+- **Three.js Post-Processing**: `EffectComposer.js`, `ShaderPass.js`, `RenderPass.js`.
+- **Custom Shaders**: `Blur.js`, `Glows.js`, and their respective GLSL fragment/vertex files.
+
+### Advantages
+- **Extreme Efficiency**: Faking DoF via screen-space UVs rather than depth textures allows the portfolio to run at 60FPS while looking incredibly premium.
+- **Conditional Processing**: In `Application.js`, Bruno detects touch devices (`this.config.touch`). If true, he sets the blur pass strength to 0. This instantly removes the heaviest GPU burden for mobile users, guaranteeing smooth physics.
+- **1D Blur Optimization**: By splitting the blur into two passes (Horizontal then Vertical), the GPU does drastically less work than a 2D Gaussian blur matrix.
+
+### Disadvantages
+- **Fill Rate Bottleneck**: The `EffectComposer` forces the GPU to draw the entire screen multiple times (Render -> Horiz Blur -> Vert Blur -> Glow). On high-resolution displays (like an iPad Pro), this mass overdraw can cause thermal throttling.
+- **Hardcoded Aesthetic**: Because the tilt-shift is hardcoded to screen UVs, it breaks instantly if the user enters "free camera" mode and looks at the horizon.
+
+### What we should reuse
+- **The Screen-Space Tilt-Shift Trick**: For the Cosmic Ocean portfolio, assuming our camera follows the boat from a fixed top-down/isometric angle, we MUST reuse the `1.0 - sin(vUv.y * M_PI)` trick. It is the cheapest, most effective way to make the ocean feel vast but stylized.
+- **Separated 1D Blurs**: If we use post-processing, we will always separate blurs into X and Y passes.
+
+### What we should avoid
+- **Blanket Mobile Disabling**: Disabling post-processing simply because a user is on a `touch` device is outdated. Modern iPhones have incredibly powerful GPUs. We should instead implement an FPS monitor at startup. If the device maintains 60FPS for the first 2 seconds, keep the passes on. If it dips below 45FPS, dynamically fade out the post-processing.
+
+---
+
+## Chapter 3 → Resource System
+
+### What exists
+The `src/javascript/Resources.js` and `src/javascript/Utils/Loader.js` classes manage all external assets. Bruno hardcoded an array containing over 100 entries mapping string names (e.g., `matcapBeige`) to file paths (`./models/matcaps/beige.png`) and explicitly defining their type (`texture` or implicitly 3D models).
+
+### Why it exists
+In highly interactive 3D web applications, "pop-in" (where a user sees a texture or model snap into existence) destroys immersion. Furthermore, a physics engine cannot calculate collisions for a model that hasn't finished downloading. The centralized `Resources.js` system exists to force an upfront loading phase, ensuring the physics engine and renderer have 100% of the required data before the user ever sees the interactive world.
+
+### How it works
+`Loader.js` iterates through the manifest provided in `Resources.js`. It utilizes specific Three.js loaders depending on the file extension: `GLTFLoader` (with `DRACOLoader` injected for compression) for `.glb` files, `FBXLoader`, and native JavaScript `Image` objects for textures.
+When a file finishes, it triggers a `fileEnd` event. `Resources.js` listens to this, calculates the progress (`this.loader.loaded / this.loader.toLoad`), and triggers a global `progress` event. The UI overlay uses this float (from 0.0 to 1.0) to update the loading screen. When complete, a final `ready` event is broadcasted.
+Interestingly, any file marked `type: 'texture'` is immediately converted to a `THREE.Texture` and stored in the global `items` dictionary.
+
+### Dependencies
+- **Three.js Loaders**: `GLTFLoader.js`, `FBXLoader.js`, `DRACOLoader.js`.
+- **Custom Utils**: `EventEmitter.js` to broadcast loading progress.
+
+### Advantages
+- **Single Source of Truth**: All assets are declared in one massive manifest. If you want to know where a file lives or what variable name it was bound to, you only have to look in `Resources.js`.
+- **Draco Compression**: Implementing Google's Draco mesh compression drastically reduces the `.glb` file sizes, speeding up the upfront load time.
+- **Synchronous Assurance**: The `World` class guarantees nothing will try to render until `Resources.ready` fires.
+
+### Disadvantages
+- **Upfront Loading Bottleneck**: Because the entire portfolio (every project, every Easter egg, every matcap) is loaded at startup, the initial Time To Interactive (TTI) is severe. This scales poorly; adding 5 new projects means longer loading times for a user who might not even drive to them.
+- **Memory Consumption**: Hundreds of textures and heavily detailed collision meshes sit in RAM and VRAM simultaneously, regardless of whether the car is near them.
+
+### What we should reuse
+- **The Event-Driven Progress Bar**: The pattern of emitting `progress` events with a float value from the loader is perfect for building beautiful loading screen transitions.
+- **Draco Compression**: Absolutely mandatory for any 3D web experience.
+
+### What we should avoid
+- **Monolithic Manifests**: For the Cosmic Ocean portfolio, we cannot load every island upfront. We must implement a chunked loader or progressive lazy loading. The "Start" island must load first, triggering the `ready` event. The surrounding islands should load silently in the background based on the boat's distance to them.
+
+---
+
+## Chapter 4 → Physics System
+
+### What exists
+The portfolio uses `cannon.js` (specifically, likely a maintained fork, given the original has been abandoned) for rigid-body physics. The logic is entirely isolated within `src/javascript/World/Physics.js`. It configures a gravity vector, defines contact materials, implements a `CANNON.RaycastVehicle` for the car, and provides a generic `addObjectFromThree` method to spawn dynamic physics objects.
+
+### Why it exists
+The portfolio is, at its heart, a driving game. Simulating suspension compression, drifting, friction, and collisions requires a robust mathematical engine. Writing a custom collision detection and resolution engine for arbitrary 3D geometry is practically impossible in a reasonable timeframe, hence the reliance on Cannon.js.
+
+### How it works
+The `Physics` constructor listens to the global `Time.js` tick and calls `this.world.step(this.time.delta / 1000)`. 
+- **The Car (`setCar()`)**: The vehicle is constructed using a `CANNON.Box` for the chassis, given a mass of 40, and an artificially offset center of mass (`new CANNON.Vec3(0, 0, 0.41)`) to keep it grounded. `this.car.vehicle = new CANNON.RaycastVehicle(...)` handles casting rays downward from four connection points to simulate wheels and suspension forces.
+- **Input Sync (`Controls.js` -> `Physics.js`)**: Based on `Controls.js` input booleans, the script applies engine force (`applyEngineForce`) and steering (`setSteeringValue`) directly to the RaycastVehicle's wheels inside the `world.addEventListener('postStep')` hook.
+- **Mesh Syncing**: After the Cannon.js world steps, a Time tick listener copies the computed `position` and `quaternion` from the invisible Cannon.js bodies to the visible Three.js meshes (`wheelMesh.position.copy(wheelBody.position)`).
+
+### Dependencies
+- **cannon.js**: The physics engine.
+- **Three.js**: To map visually.
+- **Controls.js**: To provide the raw user input commands.
+- **Time.js**: To provide the delta time for `world.step()`.
+
+### Advantages
+- **The RaycastVehicle**: By using raycasting instead of rigid constraint-based wheels, the car feels incredibly snappy and arcade-like, easily handling bumps and ramps without glitching.
+- **Friction Tuning**: Explicitly defining `CANNON.ContactMaterial` (e.g., `floorWheel` with zero restitution) ensures the car doesn't bounce endlessly like a rubber ball when it lands.
+- **The "Upside-Down" Mechanic**: The physics engine automatically detects if the car flips over by calculating `worldUp.dot(localUp) < 0.5`. If true for 1 second, it fires a vertical impulse to auto-correct the car.
+
+### Disadvantages
+- **Monolithic God Class**: `Physics.js` is over 800 lines long. It handles world configuration, the entire car simulation, mesh syncing, and generic object spawning.
+- **Cannon.js Obsolescence**: The original Cannon.js library is dead and lacks WebAssembly optimizations, causing CPU bottlenecks on complex scenes.
+- **High Gravity Hack**: Bruno set gravity to `(0, 0, -3.25 * 4)` (approx 4x Earth gravity) to make the car feel heavy and snappy. While effective, it means all other physics objects (like Easter egg lemons) fall unrealistically fast.
+
+### What we should reuse
+- **Physics/Visual Separation**: We must maintain the strict paradigm where the physics engine calculates truth (invisible bodies), and the Three.js render loop simply copies coordinates (`position` and `quaternion`) from the physics bodies.
+- **The Dot-Product Auto-Flip**: Calculating the dot product of the Up vectors to detect an overturned vehicle/boat is flawless math and should be ported directly.
+
+### What we should avoid
+- **Cannon.js**: For Cosmic Ocean, we will use **Rapier.js**. It runs on WebAssembly, is actively maintained, and is vastly more performant.
+- **The God Class**: We will separate `PhysicsWorld.ts` (handling the step loop and gravity) from `BoatController.ts` (handling the hydrodynamics and input mapping).
+
+---
+
+## Chapter 5 → World Design
+
+### What exists
+The `src/javascript/World/index.js` file is the master architect of the 3D scene. It initializes the environment (`Floor`, `Shadows`), the engines (`Physics`, `Controls`, `Objects`), and specifically divides the game world into modular chunks located in `src/javascript/World/Sections/` (e.g., `IntroSection`, `ProjectsSection`, `InformationSection`). It also manages the choreographed `reveal` animation using GSAP.
+
+### Why it exists
+Without a structured approach, a 3D portfolio would quickly become an unmanageable soup of meshes and bounding boxes. By breaking the world into "Sections", Bruno created logical, spatial zones. This modularity allows different sections to have different HTML overlays, different Easter eggs, and different visual themes while sharing the same underlying physics and rendering engines.
+
+### How it works
+Inside `World.js`, the `setSections()` method manually instantiates each area and passes it a hardcoded 2D offset coordinate.
+```javascript
+this.sections.projects = new ProjectsSection({ ..., x: 30, y: - 30 })
+this.sections.information = new InformationSection({ ..., x: 1.2, y: - 55 })
+```
+Each Section class then builds its specific 3D meshes and collision boxes relative to that `(x, y)` coordinate.
+Furthermore, `World.js` controls the initial user experience via `reveal.go()`. Once the start button is clicked, it uses GSAP to animate the `uRevealProgress` uniform on all Matcap materials from 0 to 1, slowly fading in the world, drops the car from the sky, and fades in the engine audio.
+
+### Dependencies
+- **GSAP**: Used for the sweeping `reveal()` sequence.
+- **Section Classes**: `IntroSection`, `CrossroadsSection`, `ProjectsSection`, etc.
+
+### Advantages
+- **Theatrical Presentation**: The GSAP-driven `reveal()` method is what elevates the portfolio from "cool" to "mind-blowing." Fading in shader uniforms while dropping a physics object from the sky creates immediate emotional engagement.
+- **Modular Sections**: Isolating the logic for the "Projects" board from the logic for the "Playground" makes the codebase significantly easier to navigate.
+
+### Disadvantages
+- **Hardcoded Spatial Coordinates**: Manually typing `x: 30, y: -30` in JavaScript is a tedious way to design a level. If Bruno wanted to move the Projects section closer to the Intro section, he would have to guess the coordinates, reload, check for overlap, and repeat.
+- **Synchronous Initialization**: All sections are initialized immediately, meaning all their geometries are added to the scene graph at once.
+
+### What we should reuse
+- **The Theatrical Reveal**: For Cosmic Ocean, we must reuse the GSAP uniform animation strategy. We should drop the boat into the water from above, accompanied by a heavy splash sound, while fading in the ocean shaders.
+- **The "Islands as Sections" Concept**: This directly maps to our Cosmic Ocean blueprint. Each chapter of the portfolio will be its own `IslandSection` class.
+
+### What we should avoid
+- **Hardcoding Level Coordinates**: We will not type `x, y` offsets in JS. We will assemble the entire map (the arrangement of the islands) in Blender. The relative positions will be exported in the GLTF, and our code will simply read those coordinates at runtime.
+
+---
+
+## Chapter 6 → Blender Assets
+
+### What exists
+A highly sophisticated, regex-based pipeline that turns Blender from a simple 3D modeling program into a full-fledged Level Editor. This logic resides in `src/javascript/World/Objects.js` and `Physics.js` (`addObjectFromThree`).
+
+### Why it exists
+Applying materials to hundreds of individual meshes in Three.js by writing `scene.getObjectByName('tree_001').material = mat` is agonizing and unscalable. Likewise, creating invisible physics bounding boxes mathematically in code requires endless trial and error. Bruno created this system to bridge the gap between visual design in Blender and programmatic implementation in JS.
+
+### How it works
+1. **Visual Parsers (`Objects.js`)**: When a GLTF is loaded, `Objects.js` iterates through its children. It uses Regular Expressions on the mesh names defined in Blender.
+   - If the name matches `/^shade([a-z]+)/` (e.g., `shadeWhite`), it extracts the color, looks up `this.materials.shades.items['white']`, and automatically applies the baked Matcap material.
+   - If it matches `/^floor/`, it replaces the geometry with a custom shadow-receiving plane.
+2. **Physics Parsers (`Physics.js`)**: In Blender, Bruno creates a separate layer of invisible, low-poly geometry (e.g., a simple box scaled to fit around a complex building).
+   - If he names it `box001`, `addObjectFromThree()` generates a `CANNON.Box` scaled to match.
+   - If he names it `cylinder001`, it generates a `CANNON.Cylinder`.
+   - He can rotate and position these in Blender, and Cannon.js instantly respects them.
+
+### Dependencies
+- **Three.js Utils**: Built-in GLTF traversal.
+- **JavaScript RegExp**: For parsing strings like `shadeEmeraldGreen_015`.
+
+### Advantages
+- **Lightning-Fast Iteration**: Bruno can drag, scale, and rotate objects in Blender, change a mesh name, hit Export, and the code immediately updates the physics boundaries and materials. Zero code changes required.
+- **Visual Physics**: Debugging physics is easy because the collision boundaries are visually designed in a 3D modeling tool rather than calculated in a text editor.
+
+### Disadvantages
+- **Fragile Naming Conventions**: The entire pipeline relies on perfect spelling. If a designer accidentally names a mesh `shdWhite` instead of `shadeWhite`, the regex fails, and the script falls back to a default material silently.
+- **Regex Overhead**: Running regex matches against hundreds of string names during initialization adds slight computational overhead (though negligible in the grand scheme).
+
+### What we should reuse
+- **The "Blender as Level Editor" Pipeline**: This is arguably the most brilliant engineering decision in the entire portfolio. We MUST reuse this exact pattern. We will map Blender mesh names to Rapier.js colliders (e.g., `_collider_cuboid`, `_collider_ball`) and custom shaders.
+
+### What we should avoid
+- **Silent Failures**: If a regex parser fails to match a known schema, we should not just silently apply a default material. We should implement strict validation that throws a loud `console.warn` ("Unrecognized mesh naming convention: shdWhite") so art pipeline errors are caught instantly.
+
+---
+
+## Chapter 7 → Performance Optimizations
+
+### What exists
+The application employs aggressive rendering optimizations, primarily located in `src/javascript/World/Objects.js` (`setMerge()`) and scattered `matrixAutoUpdate = false` flags throughout the codebase. The textures themselves are also baked (Matcaps) to completely bypass real-time lighting calculations.
+
+### Why it exists
+WebGL performance is heavily bottlenecked by "Draw Calls"—the number of times the CPU has to tell the GPU to draw a new material/mesh. If a scene has 500 trees, 100 rocks, and 50 signs, that's 650 draw calls per frame, which will instantly crash Safari on an older iPhone. Optimization exists to guarantee 60 FPS while maintaining visual fidelity.
+
+### How it works
+- **Geometry Merging (`setMerge()`)**: When static objects (`mass === 0`) are loaded, Bruno's script iterates through them and groups them by Material. It extracts the raw `THREE.BufferGeometry`, mathematically applies the mesh's World Matrix directly to the vertex coordinates (locking them into global space), and adds them to an array. Finally, it uses `BufferGeometryUtils.mergeGeometries()` to crush hundreds of geometries into a single massive geometry, creating just one `THREE.Mesh` per material. 
+- **Matrix Freezing**: By default, Three.js recalculates the 3D transform matrix (`scale * rotation * position`) of every object on every single frame. For static environment objects, Bruno explicitly sets `mesh.matrixAutoUpdate = false` and calls `mesh.updateMatrix()` exactly once during initialization.
+- **Baked Lighting (Matcaps)**: There are no lights (`THREE.DirectionalLight`, `THREE.AmbientLight`) in the scene. All shading and shadows are painted directly onto the textures or faked with Matcaps, making the rendering effectively free.
+
+### Dependencies
+- **Three.js Utils**: `BufferGeometryUtils.js` from the Three.js examples addon.
+
+### Advantages
+- **Unbelievable Draw Call Reduction**: A sprawling island with hundreds of architectural details is collapsed down to 3 or 4 draw calls (one for each material).
+- **CPU Preservation**: Freezing matrices saves enormous amounts of JavaScript calculation time per frame, leaving the CPU completely free to run the Cannon.js physics step.
+
+### Disadvantages
+- **No Frustum Culling**: Because 500 trees are merged into one massive object, Three.js can no longer frustum cull (hide) the trees behind the camera. If even one leaf of one tree is on-screen, the GPU must render the entire massive geometry.
+- **Static Rigidity**: Merged geometry cannot be animated, scaled, or moved individually after the merge. 
+
+### What we should reuse
+- **Matrix Auto-Update Disabling**: This is free performance and should be applied to every single static island mesh in the Cosmic Ocean.
+- **Baked Lighting**: We will use baked textures and Matcaps for our islands to keep the art style consistent and the framerate high.
+
+### What we should avoid
+- **`BufferGeometryUtils.mergeGeometries`**: While brilliant for 2019, modern Three.js (post-2022) includes `THREE.BatchedMesh` and `THREE.InstancedMesh`. These modern APIs provide the exact same draw-call reduction but still allow for individual frustum culling and per-instance movement. We will use `InstancedMesh` or `BatchedMesh` for the Cosmic Ocean.
+
+---
+
+## Chapter 8 → Discovery System (Easter Eggs)
+
+### What exists
+A dedicated `src/javascript/World/EasterEggs.js` class that manages hidden interactions. This includes listening for the Konami code to rain lemons from the sky, a hidden area that applies random wigs to the car, and scattered "Three.js Journey" discount codes.
+
+### Why it exists
+A portfolio can easily become a dry, sterile list of links. Injecting hidden, game-like mechanics creates a viral, memorable experience. It encourages the user to drive to every corner of the map rather than just looking at the first project and leaving. 
+
+### How it works
+- **The Konami Code (`setKonamiCode`)**: The class attaches a raw DOM `window.addEventListener('keydown')`. Every keystroke is pushed into a `latestKeys` array. If the stringified array matches `['ArrowUp', 'ArrowUp', 'ArrowDown', ...]`, it triggers a loop. Inside the loop, it uses `setTimeout` to dynamically instantiate Cannon.js Sphere colliders (`lemonCollision.glb`) directly above the car's coordinates, setting `sleep: false` so gravity immediately pulls them down.
+- **The Wigs (`setWigs`)**: It defines an invisible `Area` (the interaction system) far off the main path. When the user drives into it and interacts, it randomly cycles the `visible` property and `material` of a set of wig meshes physically attached to the car's hierarchy.
+
+### Dependencies
+- **DOM Events**: Native browser keyboard and touch gesture listeners.
+- **Physics.js & Objects.js**: To dynamically spawn the lemons.
+- **Areas.js**: For the proximity-based wig trigger.
+
+### Advantages
+- **Physics Validation**: Raining 50 lemons dynamically onto the car proves to the user how robust the physics engine is, as the lemons bounce off the car and roll down the ramps realistically.
+- **High Engagement**: Finding a hidden interaction heavily increases the time-on-site metric.
+
+### Disadvantages
+- **Messy Architecture**: Attaching raw `window.addEventListener` DOM events deep inside a 3D logic class (`EasterEggs.js`) violates the separation of concerns. If the component unmounts or restarts, these ghost listeners could cause memory leaks.
+- **Hardcoded State**: The Konami code logic relies on stringifying hardcoded arrays, which is a brittle way to handle complex input sequences.
+
+### What we should reuse
+- **Physical Rewards**: The concept of rewarding exploration with dynamic physics objects. In Cosmic Ocean, driving into a hidden cove could spawn physics-enabled glowing jellyfish or gold coins that bounce off the boat's hull.
+- **Visual Modifiers**: Finding hidden items that alter the appearance of the vehicle (like the wigs) is a fantastic idea to keep.
+
+### What we should avoid
+- **Scattered DOM Listeners**: We will not attach `window.addEventListener` inside our 3D classes. We will create a centralized `InputManager.ts` that handles all keystrokes, gamepad inputs, and touch gestures, which then emits strict, typed events (e.g., `InputManager.on('KonamiCodeEntered')`) for the 3D classes to listen to.
+
+---
+
+## Chapter 9 → Interaction System
+
+### What exists
+The `src/javascript/World/Areas.js` and `src/javascript/World/Area.js` classes bridge the gap between the 3D WebGL context and traditional 2D HTML interactions (like opening a link or clicking a button). 
+
+### Why it exists
+Users still need to read text, click links to view case studies, and follow social media handles. Trying to render crisp, readable text and hyperlinks purely in WebGL is notoriously difficult and bad for SEO/Accessibility. The Interaction System exists to trigger traditional HTML/CSS overlays exactly when the user is looking at or driving near a specific 3D object.
+
+### How it works
+The interaction system operates on two distinct axes:
+1. **Mouse / Touch Raycasting**: `Areas.js` tracks normalized `(x, y)` device coordinates and uses `THREE.Raycaster.setFromCamera()`. Crucially, it does *not* test for intersections against the complex 3D project models. Instead, each interactive object has an invisible 2D `PlaneGeometry` (`mouseMesh`) laid flat beneath it. The raycaster only checks this tiny array of invisible planes. When hit, it triggers the `in()` method (changing the cursor to a pointer) or `out()` method.
+2. **Car Proximity Sensing**: Every `Area` instance defines a 2D bounding box using a center `position` and `halfExtents` (width/height). On every tick, `Areas.js` checks if the car's `(x, y)` coordinates fall within this mathematical box. If the car enters the box, it triggers the HTML tooltip prompting the user to press "Enter".
+
+### Dependencies
+- **THREE.Raycaster**: For converting screen-space clicks to 3D world coordinates.
+- **HTML/CSS DOM Elements**: To display the floating labels and "Press Enter" prompts.
+
+### Advantages
+- **Extreme Efficiency**: Raycasting against 10 invisible, flat, 4-vertex planes is infinitely faster than raycasting against hundreds of complex GLTF geometries.
+- **Dual Support**: Building the system to respond to both Mouse Clicks (for desktop power users) and Car Proximity (for mobile users and gamepads) ensures accessibility across all devices.
+
+### Disadvantages
+- **Z-Axis Ignorance**: Because the proximity check only uses 2D `(x, y)` math, it ignores the Z-axis (height). If the car somehow jumped 50 feet into the air over a project board, the prompt would still trigger.
+- **Decoupled HTML**: Syncing 3D world coordinates to floating HTML elements can feel sluggish if the camera pans too quickly.
+
+### What we should reuse
+- **The Dual Interaction Model**: We absolutely need to support both "Clicking" on a glowing island to travel to it, and "Sailing" into its proximity radius to trigger it.
+- **Proxy Raycast Geometry**: We will never raycast against our high-poly visual models. We will always raycast against invisible, simplified proxy meshes.
+
+### What we should avoid
+- **Vanilla DOM Syncing**: Instead of manually calculating CSS `transform: translate(x, y)` in vanilla JS, we will use modern utilities (like `Html` from `@react-three/drei` if using React, or a robust CSS2DRenderer integration) to keep DOM elements perfectly glued to their 3D anchors without jitter.
+
+---
+
+## Chapter 10 → Lessons For Cosmic Ocean
+
+### What exists
+This final chapter synthesizes the 9 preceding architectural deep dives into concrete engineering directives for our goal: building a superior, modern portfolio ("Cosmic Ocean") from scratch.
+
+### Why it exists
+To ensure we do not simply copy a 2019 codebase, but rather extract its genius principles and upgrade them using 2024+ technology stacks. We must ensure the final product guarantees the user thinks: *"He's the guy we need to hire."*
+
+### How it works
+We will implement the following architectural blueprint for the Cosmic Ocean:
+
+1. **The Pipeline (The "Genius" Lesson)**
+   - **Blender as the Engine**: We will build the Ocean plane, the Islands, and the invisible Collision Boundaries entirely in Blender. 
+   - **Regex Parsing**: We will write a custom GLTF parser that reads mesh names (`_mat_sand`, `_col_box`) and automatically assigns baked textures and physics bodies at runtime.
+
+2. **The Physics (The "Fake It First" Lesson)**
+   - **Phase 1 (Kinematics)**: We do not need a heavy physics engine initially. We will implement fake boat physics using simple math: Velocity, Acceleration, Drag, and Rotation. This allows immediate, tight iteration on the "feel" of sailing without the massive overhead of configuring a rigid-body world.
+   - **Phase 2 (Rapier.js)**: We will only introduce Rapier.js later if the complexity of colliding with dynamic objects absolutely requires it.
+
+3. **The Rendering (The "Aesthetic" Lesson)**
+   - **Tilt-Shift Math**: We will implement the `1.0 - sin(vUv.y * M_PI)` screen-space UV math in a custom `EffectComposer` blur pass to achieve the gorgeous miniature diorama aesthetic at virtually zero GPU cost.
+   - **Baked Lighting**: No real-time lights. All shadows and highlights will be baked into Matcaps or texture atlases.
+
+4. **The Optimizations (The "Performance" Lesson)**
+   - **InstancedMesh**: Instead of Bruno's rigid `BufferGeometryUtils.mergeGeometries()`, we will use `THREE.InstancedMesh` for repeated elements (rocks, buoys, trees). This reduces draw calls to 1 while allowing individual scaling, bobbing animations in the water, and frustum culling.
+   - **Matrix Freezing**: All static island geometries will have `matrixAutoUpdate = false`.
+
+5. **The Architecture (The "Simplicity" Lesson)**
+   - **App Singleton**: We will completely eliminate the massive 12-argument constructor prop drilling seen in `Car.js` by using a dead-simple `App` Singleton (`App.renderer`, `App.resources`, `App.physics`). This is fast, readable, and perfect for a solo portfolio project.
+   - **Simple HTML Overlays**: We will avoid complex, bug-prone syncing engines like `CSS2DRenderer` and stick to simple HTML DOM overlays until extreme complexity demands otherwise.
+   - **Centralized Input**: A dedicated `InputManager.ts` will capture DOM events and emit abstract game events, keeping our 3D logic perfectly clean.
+
+### Dependencies
+- **Three.js** (Rendering)
+- **Vite** (Bundling)
+- **TypeScript** (Architecture)
+- **Blender** (Level Design)
+
+### Advantages
+- By utilizing modern APIs (InstancedMesh) while retaining the battle-tested visual hacks (Screen-space DoF, Regex Asset Parsing), Cosmic Ocean will run faster, load quicker, and be drastically easier to maintain than the original portfolio. Using simple kinematic physics and an App Singleton prevents over-engineering.
+
+### Disadvantages
+- Requires writing the Blender parsing logic and the fake boat kinematics completely from scratch.
+
+### What we should reuse
+- The philosophy of deterministic, frame-locked render loops.
+- The philosophy of rewarding user exploration with dynamic physical interactions.
+
+### What we should avoid
+- Sync-loading every asset upfront. We must implement progressive loading so the user can begin sailing the moment the starting area is ready.
+- Over-architecting (like Dependency Injection) for a solo project. Keep it simple.
+
+---
+
+## Chapter 12 → Asset Pipeline Analysis
+
+### What exists
+The `src/javascript/World/Objects.js` and `Physics.js` classes handle the runtime ingestion of assets, but the true asset pipeline happens before the code runs: inside Blender and during the GLB export process.
+
+### Why it exists
+A 3D portfolio cannot be modeled using code primitives (`THREE.BoxGeometry`). The asset pipeline exists to decouple the artistic level design from the programming logic, allowing massive visual iterations without touching JavaScript.
+
+### How it works
+- **Blender Workflow**: The entire world (or sections of it) is modeled in a single Blender file. Visual meshes are separated from invisible collision meshes into distinct collections.
+- **Model Optimization**: Geometry is kept ruthlessly low-poly. There are no high-res sculpts; the "detail" comes entirely from the baked colors and the tilt-shift post-processing.
+- **GLB Export Process**: The scene is exported as a Binary glTF (`.glb`). Crucially, Draco compression is applied during or after export. Draco re-orders and compresses the vertex data, often shrinking the file size by 70-80%.
+- **Material System**: Materials are not configured in Blender. Instead, the mesh name (e.g., `shadePink_001`) acts as a string identifier. At runtime, Three.js parses this name and automatically applies a pre-loaded, pre-configured `THREE.MeshNormalMaterial` or Matcap texture.
+
+### Dependencies
+- **Blender**: For 3D modeling and UV mapping.
+- **Draco Compression**: `DRACOLoader.js` inside Three.js.
+- **Regex Parsing**: Inside `Objects.js`.
+
+### Advantages
+- Decouples Art from Code. The developer never has to write `scene.add(tree)` manually.
+- Draco compression guarantees fast download times, even on mobile networks.
+
+### Disadvantages
+- If the Blender file gets too large, exporting and applying Draco compression can take several minutes per iteration.
+
+### Output: How we should build the Cosmic Ocean asset pipeline
+1. **Modular Island Files**: Instead of one massive Blender file, we will have `island_start.glb`, `island_projects.glb`, etc.
+2. **Strict Naming Convention**: We will use prefixes. `_vis_` for visual meshes, `_col_` for kinematic/collision bounds, `_water_` for the ocean mesh.
+3. **Automated Material Assignment**: Our Vite pipeline will load the `.glb`. If a mesh starts with `_water_`, we immediately apply our custom GLSL Ocean Shader. If it starts with `_vis_rock`, we apply the baked rock texture.
+4. **Draco Mandatory**: We will run all exported GLBs through the `gltf-pipeline` CLI tool to apply aggressive Draco compression before deployment.
+
+---
+
+## Chapter 13 → Level Design Analysis
+
+### What exists
+The spatial organization of the 3D world, specifically the layout of the `Sections` (Playground, Projects, Information) defined in `World.js`.
+
+### Why it exists
+To prevent the user from feeling lost in an empty void. Good level design subconsciously guides the user exactly where the creator wants them to go without explicitly telling them.
+
+### How it works
+- **Sightlines & Visual Breadcrumbs**: The camera is locked at a 45-degree isometric angle. Bruno intentionally places tall objects (like the giant "Three.js Journey" car or the colored project boards) so their very tips bleed into the edge of the user's screen from the starting position. This creates an "information gap."
+- **Landmarks**: Massive, distinct objects anchor the user's mental map. If you see the bowling pins, you know you are in the playground.
+- **Navigation**: The layout is essentially a hub-and-spoke model. The user starts in the center intersection (the Hub). From there, they can drive down three distinct roads (Spokes) to the different sections.
+- **Visual Storytelling**: The environment matches the content. The "Projects" section looks like a neon highway of billboards.
+
+### Dependencies
+- **Camera.js**: The locked isometric angle is what makes the sightlines work.
+- **Sections**: The modular grid layout.
+
+### Advantages
+- The user never feels lost. The invisible walls keep them on the path, while the landmarks provide constant orientation.
+
+### Disadvantages
+- The hub-and-spoke model forces backtracking. Once you drive to the end of the Projects section, you have to drive all the way back to the center to see the Information section.
+
+### Output: How we should guide users through Cosmic Ocean
+1. **The Hub Lagoon**: The boat drops into a central, calm lagoon.
+2. **Lighthouses as Landmarks**: Instead of billboards, each "Project" or "Chapter" is its own distinct island. The most important projects will have towering, glowing lighthouses or bioluminescent trees that are visible through the fog from the starting lagoon.
+3. **Currents (Invisible Navigation)**: To solve the backtracking problem, if the user stops steering, invisible "ocean currents" (simple math vectors applied to the kinematic boat) will slowly, naturally drift the boat toward the next point of interest.
+4. **Fog of War**: We will use Three.js `scene.fog` heavily. Islands will slowly emerge from the mist, maximizing the feeling of discovery.
+
+---
+
+## Chapter 14 → Recruiter Psychology Analysis
+
+### What exists
+An analysis of the psychological levers that made Bruno Simon's portfolio universally recognized as the gold standard, and how it manipulates user attention.
+
+### Why it exists
+We are building a hiring magnet. Understanding the psychology of engagement is more important than the rendering code. If Cosmic Ocean is just a tech demo, recruiters will close it in 10 seconds.
+
+### How it works
+- **Why recruiters remember the portfolio**: **Proof of Work**. Most developers *say* they understand 3D math, physics, and performance. Bruno *proved* it silently in 5 seconds. The medium (a flawless 3D game) perfectly validated the message ("I am an elite WebGL Developer").
+- **Why it went viral**: **Cross-Disciplinary Appeal**. Designers loved the baked lighting and tilt-shift aesthetic. Gamers loved the arcade RC-car feel. It appealed to human playfulness, breaking out of the tech bubble.
+- **Why people keep exploring**: **Curiosity Loops**. Visual breadcrumbs (seeing the edge of a ramp off-screen) trigger an innate human need to close the "information gap". You drive over there simply because your brain demands to know what it is.
+- **Dopamine Loops**: The "Micro-rewards" of tight game feel. Steering the car provides instant, snappy feedback. Hitting a stack of physics blocks and watching them scatter releases a tiny hit of dopamine. The user stays because interacting with the world feels physically satisfying.
+
+### Dependencies
+- Empathy for the end-user (Recruiters/Hiring Managers).
+- Meticulous tuning of "Game Feel" (Kinematics, Audio, VFX).
+
+### Advantages
+- By optimizing for "Time on Site" and "Shareability" (via Easter Eggs), the portfolio does the networking and marketing for you.
+
+### Disadvantages
+- "Game Feel" is incredibly hard to tune. If the boat feels sluggish or frustrating to steer, the recruiter will close the tab immediately.
+
+### Output: How Cosmic Ocean can outperform a traditional portfolio
+- **The "Wow" Hook**: Within 3 seconds, the user must control the boat and see the water react (wake/foam). The tactile feel of the kinematic boat must be so satisfying that they want to keep sailing.
+- **Zero Friction**: Traditional 3D portfolios have massive 30-second loading screens. Cosmic Ocean will drop the user in *instantly* with progressive chunk loading.
+- **Aesthetic Overload**: The RC-car aesthetic is very 2019. We will use a deeply atmospheric, highly polished ocean aesthetic. Glowing water, bioluminescence, and a beautifully stylized boat will make the portfolio feel like a premium indie game (like *Journey* or *Abzû*), creating an unforgettable emotional resonance that standard portfolios simply cannot match.
+
+---
+*End of Technical Report*

@@ -1,0 +1,178 @@
+# Cosmic Ocean: QA & Testing Bible (V1)
+
+*This document is the definitive quality assurance blueprint. No code reaches production without passing the criteria established here.*
+
+---
+
+## 1. Testing Philosophy
+*   **Recruiter Experience First:** The path to the resume and project information must never be obstructed by bugs or complex gameplay.
+*   **Stability Over Visual Polish:** If an aesthetic feature (e.g., shaders, whale) causes crashes or frame drops, it must be killed via Feature Flags.
+*   **Zero-Friction Fallbacks:** All edge cases (missing assets, network drops, bad JSON) must degrade gracefully. White screens are release blockers.
+
+---
+
+## 2. Smoke Test Suite
+*Run this suite manually every time the development server starts.*
+
+| ID | Test Case | Expected Result |
+| :--- | :--- | :--- |
+| ST-01 | **Application Startup** | Page loads without white-screen hanging. Loading screen appears instantly. |
+| ST-02 | **Asset Loading** | `Promise.all()` completes successfully. Loading screen fades out to reveal the Hub Lagoon. |
+| ST-03 | **Boat Spawning** | Boat sits exactly at `(0, 0)` on the water plane, facing North-East. |
+| ST-04 | **Camera Following** | Camera locks to the boat with a strict `(+10, +10, +10)` offset. |
+| ST-05 | **Resume Mode Opening** | Clicking `[View Resume]` instantly halts 3D rendering and reveals the HTML resume. |
+| ST-06 | **Resume Mode Closing** | Closing the resume seamlessly resumes the 3D render loop. |
+| ST-07 | **Modal Opening** | Sailing into a Project Monolith trigger radius opens the Case Study Modal. |
+| ST-08 | **Modal Closing** | Pressing `Esc` or clicking outside the modal closes it and returns focus to the canvas. |
+| ST-09 | **Lighthouse Sequence** | Entering the Harbor `(200, 300)` with fragments activates the volumetric light and shows the Contact Form. |
+| ST-10 | **Contact Form** | Submitting dummy data results in a success state and fires `contact_submitted` analytics event. |
+
+---
+
+## 3. The Lighthouse Recruiter Journey Test
+*This is the single most important test. If this flow breaks or exceeds the time limit, the release is blocked.*
+
+**Execution:**
+1. Open website.
+2. Instantly click `[View Resume]` mode upon load.
+3. Sail/click to the first Project Monolith and read the case study.
+4. Click `[GitHub Repo]` link inside the modal.
+5. Sail to the Harbor and submit the Contact Form.
+
+**Pass Criteria:** The entire flow must be completed in **< 3 minutes** with zero friction.
+
+---
+
+## 3. Functional Test Suite
+*Run this suite before merging any feature branches into `main`.*
+
+### Core Gameplay
+*   **FT-01 Boat Movement:** Boat accelerates smoothly via WASD/Arrows. Applying no input results in gradual drag-induced stop.
+*   **FT-02 Boundary Collisions:** Sailing past `+/- 250` X/Z clamps velocity to 0 and gently pushes the boat back.
+*   **FT-03 Fragment Collection:** Fragments attach to the boat mesh upon closing a Project Modal. The UI counter increments.
+*   **FT-04 Whale Event:** Crossing `Z = 180` with `fragments > 0` spawns the Whale exactly underneath the boat.
+*   **FT-05 Observatory Discovery:** Sailing to `(-150, -150)` opens the Timeline Modal.
+
+### Systems
+*   **FT-06 Save System:** Collecting a fragment, refreshing the page, and reloading must show the fragment already collected.
+*   **FT-07 Save System Corruption:** Manually corrupt `localStorage` data, delete the file, or create a partial save. The game must recover automatically and initialize a clean state without crashing.
+*   **FT-08 Audio Triggers:** Approaching the Harbor increases the volume of the ambient soundscape.
+
+---
+
+## 4. Browser & Device Compatibility Matrix
+*Verify core functionality across these environments. Required: No visual breakage, no console errors, no shader crashes.*
+
+| Device / Browser | Target FPS | Resume Usable? | Virtual Joystick OK? | Ocean Degradation? |
+| :--- | :--- | :--- | :--- | :--- |
+| Android Chrome | 60 | Yes | Yes | `64x64` segments |
+| Android Firefox | 60 | Yes | Yes | `64x64` segments |
+| iPhone Safari | 60 | Yes | Yes | `64x64` segments |
+| Desktop Chrome (Latest) | 60 | Yes | N/A | `128x128` segments |
+| Desktop Firefox (Latest) | 60 | Yes | N/A | `128x128` segments |
+| Desktop Safari (Latest) | 60 | Yes | N/A | `128x128` segments |
+| Desktop Edge (Latest) | 60 | Yes | N/A | `128x128` segments |
+
+---
+
+## 5. Accessibility Testing
+*   **Keyboard Navigation:** Open the site. Do not touch the mouse. Use `Tab` and `Enter` to navigate to `[View Resume]`, tab through every project, and submit the contact form.
+*   **Focus States:** Ensure every tabbed element has a visible `2px solid #00F0FF` outline.
+*   **Screen Reader Support:** Verify the HTML Resume tree uses proper `<main>`, `<section>`, `<h1>`, and `<h2>` hierarchy.
+*   **Reduced Motion:** Toggle OS-level "Reduce Motion." Verify animations freeze and modal transitions become instantaneous.
+
+---
+
+## 6. Performance Testing & Profiling
+If any thresholds are breached on target devices, the corresponding Kill Switch must be flipped. Use Chrome DevTools Performance Tab.
+
+### 6.1 Browser Profiling & Logging Requirements
+*   **Performance Metrics Logging:** In development mode, the application must log the following metrics every 5 seconds: FPS, Draw Calls, Triangles, Memory Usage, Load Time.
+*   **Main Thread Time:** `< 16ms` per frame to ensure solid 60FPS.
+*   **Memory Usage Monitoring:** Leave the project running for 30 minutes. Memory growth must stabilize. There must be no increasing heap trend.
+*   **Context Loss:** Simulate WebGL context loss. Application should attempt recovery or show error without locking the browser.
+
+### 6.2 Hard Budgets
+| Metric | Target | Failure Threshold | Action / Kill Switch |
+| :--- | :--- | :--- | :--- |
+| **Target FPS** | 60 FPS | Drops below 45 FPS | Trigger `enablePostProcessing: false` |
+| **Draw Calls** | < 80 | > 120 | Merge static meshes. Remove particle wakes. |
+| **Triangle Count**| < 100k | > 150k | Switch Ocean to `MeshStandardMaterial`. |
+| **Asset Size** | < 10 MB total | > 15 MB | Aggressively Draco-compress remaining GLBs. |
+
+---
+
+## 7. Analytics Verification
+*Open Network Tab -> Filter by Analytics Endpoint.*
+
+1.  **`session_start`**: Fires exactly once when `Promise.all()` resolves.
+2.  **`resume_mode_opened`**: Fires when standard resume layout mounts.
+3.  **`project_viewed`**: Fires when a Monolith modal opens. Verify `projectId` exists in payload metadata.
+4.  **`github_clicked` & `demo_clicked`**: Fires upon CTA clicks inside modals.
+5.  **`observatory_found`**: Fires upon entering the `(-150, -150)` radius.
+6.  **`contact_submitted`**: Fires only upon successful form validation and submission.
+7.  **`lighthouse_activated`**: Fires when the Harbor trigger activates.
+
+---
+
+## 8. Error Handling & Validation Tests
+*Simulate failure states to guarantee recruiter safety.*
+
+### 8.1 Engine & Network Errors
+*   **Missing Model:** Rename `monoliths.glb` to `broken.glb`. Verify application loads with a placeholder box.
+*   **Failed Audio:** Block audio loading via dev tools. Verify game plays silently without crashing.
+*   **Local Storage Disabled:** Open in strict Incognito mode. Verify the game doesn't crash when `localStorage.setItem` throws an error.
+*   **Asset Loading Stress Test:** Simulate Slow 3G network conditions. The loading screen must remain visible with no broken UI or white screens while assets stream in.
+
+### 8.2 Content Validation Tests
+*   **Bad content.json:** Introduce a syntax error in `data.json`. Verify the "Fatal Validation Error" screen appears.
+*   **Missing Schema Entities:** Remove a project, skill, or trigger from JSON. Schema validator must catch the orphan data.
+*   **Invalid Coordinates:** Set a trigger coordinate to an invalid type. Validator must catch and fail gracefully.
+
+### 8.3 Feature Flag Testing
+*QA must verify the application works flawlessly with every single flag disabled via JSON configuration.*
+*   `enableWhale: false` -> Whale never spawns, no errors thrown.
+*   `enableAudio: false` -> Howler never initializes, no missing context warnings.
+*   `enableParticles: false` -> Wakes and stardust don't render, draw calls drop.
+*   `enableObservatory: false` -> Island doesn't spawn, timeline trigger is absent.
+*   `enablePostProcessing: false` -> EffectComposer is bypassed, standard WebGLRenderer used.
+---
+
+## 9. Bug Severity System
+
+| Severity | Definition | Cosmic Ocean Example |
+| :--- | :--- | :--- |
+| **Critical** | Breaks core recruiter flow. Release Blocker. | Resume button doesn't work. `Promise.all()` hangs forever. |
+| **High** | Breaks gameplay or major visual systems. | Boat sails through islands. Modals overlap each other. |
+| **Medium** | Minor UI glitches or non-critical interaction bugs. | Typos in resume. Wake particles rendering in front of boat. |
+| **Low** | Barely noticeable polish issues. | Whale flips slightly too fast. Small CSS padding error. |
+
+---
+
+## 10. Automated Testing
+*We do not require full E2E or snapshot testing, but critical utilities must be covered using `vitest`.*
+*   **Schema Validation Tests:** Ensure Zod/TypeScript correctly parses `content.json` and throws expected errors.
+*   **Utility Function Tests:** Unit test complex math helpers (e.g., raycasting geometry bounds, specific formatting functions).
+
+---
+
+## 11. Regression Checklist
+*Run this before pushing to the `main` branch.*
+
+- [ ] Run `npm run build` locally to verify Vite bundling.
+- [ ] Run Smoke Test Suite (ST-01 through ST-10).
+- [ ] Verify `featureFlags.enableWhale` is explicitly set to `true`.
+- [ ] Run Lighthouse Audit on Resume Mode (Must score 90+ in Accessibility).
+- [ ] Clear browser cache and perform a clean load.
+
+---
+
+## 12. Release Criteria (V1 Launch)
+Cosmic Ocean V1 is **ONLY** approved for deployment when:
+1.  There are exactly `0` Critical and `0` High severity bugs in the backlog.
+2.  The Vertical Slice features (Resume, Movement, 1 Project) work flawlessly on both Desktop Chrome and iPhone Safari.
+3.  The full end-to-end recruiter experience takes no more than 3 minutes to parse.
+4.  The JSON schema validation passes 100% with `validationErrors: []`.
+
+---
+*End of QA & Testing Bible*

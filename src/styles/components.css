@@ -86,6 +86,8 @@
   background-color: rgba(10, 15, 29, 0.95);
   padding: 1rem 2rem;
   display: flex;
+  flex-wrap: wrap; /* Prevent overflow */
+  gap: 1rem;
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -94,8 +96,9 @@
 
 .resume-nav ul {
   display: flex;
+  flex-wrap: wrap; /* Prevent links from overflowing */
   list-style: none;
-  gap: 2rem;
+  gap: 1rem; /* Reduce gap for smaller screens */
   margin: 0;
   padding: 0;
 }

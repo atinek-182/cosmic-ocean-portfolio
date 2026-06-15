@@ -1,0 +1,95 @@
+{
+  "buildInfo": {
+    "version": "1.0.0",
+    "buildDate": "2024-05-15T00:00:00Z",
+    "commitHash": "abcdef"
+  },
+  "featureFlags": {
+    "enableWhale": true,
+    "enableAudio": false,
+    "enableAnalytics": false,
+    "enableObservatory": true,
+    "enablePostProcessing": true
+  },
+  "assetManifest": {
+    "modelPath": "/assets/models/",
+    "audioPath": "/assets/audio/",
+    "texturePath": "/assets/textures/",
+    "preloadPriority": ["island_hub", "boat_player"]
+  },
+  "developer": {
+    "name": "Jane Doe",
+    "role": "Creative Frontend Engineer",
+    "email": "jane@example.com",
+    "github": "https://github.com/janedoe",
+    "linkedin": "https://linkedin.com/in/janedoe",
+    "tagline": "Building immersive web experiences"
+  },
+  "resume": {
+    "summary": [
+      "I am a software engineer focused on 3D web experiences.",
+      "I love bridging the gap between design and engineering."
+    ],
+    "experience": [
+      {
+        "id": "exp-1",
+        "company": "Tech Corp",
+        "role": "Frontend Developer",
+        "startDate": "2022-01",
+        "endDate": "Present",
+        "bullets": [
+          "Developed high-performance WebGL applications.",
+          "Led migration from Vue to React."
+        ]
+      }
+    ]
+  },
+  "skills": [
+    {
+      "categoryName": "Languages",
+      "skills": [
+        { "id": "ts", "name": "TypeScript", "level": "Advanced" },
+        { "id": "glsl", "name": "GLSL", "level": "Intermediate" }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "project-alpha",
+      "title": "Neon Racer",
+      "year": 2023,
+      "displayOrder": 1,
+      "thumbnailUrl": "/assets/images/neon-racer.webp",
+      "techStackIds": ["ts", "glsl"],
+      "description": {
+        "problem": "Web racing games often lack arcade physics.",
+        "solution": "Built a custom kinematic engine simulating arcade drift mechanics."
+      },
+      "links": {
+        "githubRepo": "https://github.com/janedoe/neon-racer"
+      }
+    }
+  ],
+  "observatoryTimeline": [
+    {
+      "year": 2018,
+      "title": "First Line of Code",
+      "description": "Wrote Hello World in Python.",
+      "isMajorMilestone": true
+    }
+  ],
+  "worldTriggers": [
+    {
+      "id": "project-alpha",
+      "type": "project",
+      "coordinates": { "x": 100, "z": 120 },
+      "triggerRadius": 35
+    },
+    {
+      "id": "harbor",
+      "type": "harbor",
+      "coordinates": { "x": 200, "z": 300 },
+      "triggerRadius": 30
+    }
+  ]
+}

@@ -3,6 +3,10 @@ import Sizes from './Sizes';
 import Time from './Time';
 import Camera from './Camera';
 import Renderer from './Renderer';
+import ContentManager from './ContentManager';
+import UIManager from './UIManager';
+import { AppState } from './AppState';
+import FeatureFlags from './FeatureFlags';
 
 export default class App {
     public canvas: HTMLCanvasElement;
@@ -11,26 +15,59 @@ export default class App {
     public time: Time;
     public camera: Camera;
     public renderer: Renderer;
+    
+    public content: ContentManager;
+    public ui!: UIManager;
+    public flags!: FeatureFlags;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
         
-        // Initialize core engine singletons
+        // 1. Create core systems
         this.sizes = new Sizes();
         this.time = new Time();
         this.scene = new THREE.Scene();
         
-        // Explicit dependency injection
         this.camera = new Camera(this);
         this.renderer = new Renderer(this);
+        this.content = new ContentManager();
 
-        // Bind requestAnimationFrame loop to update method
-        this.time.on('tick', () => {
-            this.update();
+        this.init();
+    }
+
+    private async init() {
+        // 2. Load content.json
+        // 3. Validate content
+        this.content.on('contentLoaded', () => {
+            this.flags = new FeatureFlags(this.content.data?.featureFlags);
+            
+            // 4. Create UIManager
+            this.ui = new UIManager(this);
+            
+            // 5. Show Landing Screen
+            this.ui.showLandingScreen();
+
+            // Start loop only after UI is ready
+            this.time.on('tick', () => {
+                this.update();
+            });
         });
+
+        this.content.on('contentFailed', (errors: string[]) => {
+            // Render full-screen error UI.
+            this.ui = new UIManager(this);
+            this.ui.showErrorScreen(errors);
+        });
+
+        await this.content.loadContent();
     }
 
     public update(): void {
+        // Stop rendering while in RESUME state
+        if (this.ui && this.ui.currentState === AppState.RESUME) {
+            return;
+        }
+
         this.camera.update();
         this.renderer.update();
     }

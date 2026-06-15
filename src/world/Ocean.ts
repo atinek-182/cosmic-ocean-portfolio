@@ -14,9 +14,9 @@ export default class Ocean {
         this.geometry.rotateX(-Math.PI * 0.5); // lay flat
 
         const material = new THREE.MeshStandardMaterial({
-            color: 0x0a1e3f,
-            roughness: 0.1,
-            metalness: 0.1,
+            color: 0x005577, // Deeper, more saturated water color
+            roughness: 0.15,
+            metalness: 0.85, // More reflective for specular highlights
             flatShading: true // Low-poly stylistic look
         });
 
@@ -34,13 +34,15 @@ export default class Ocean {
             const z = positionAttribute.getZ(i);
             
             // Combined sine waves create a rolling water effect
-            const y = Math.sin(x * 0.1 + elapsedTime) * 0.5 
-                    + Math.cos(z * 0.1 + elapsedTime) * 0.5;
+            const y = Math.sin(x * 0.2 + elapsedTime) * 0.6 
+                    + Math.cos(z * 0.15 + elapsedTime * 0.8) * 0.4;
             
             positionAttribute.setY(i, y);
         }
         
         // Tell Three.js the vertices changed
         positionAttribute.needsUpdate = true;
+        // Recompute normals so the light reflects correctly off the new waves
+        this.geometry.computeVertexNormals();
     }
 }

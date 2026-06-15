@@ -6,14 +6,15 @@ export default class Islands {
     constructor() {
         this.container = new THREE.Group();
 
-        // Hardcoded minimal placeholders
+        // Adjusted positions so they are within initial camera frustum range
         const positions = [
-            { x: 50, z: -50, color: 0x228b22 },
-            { x: -80, z: 40, color: 0x8b4513 },
-            { x: 100, z: 120, color: 0x556b2f }
+            { x: -15, z: -20, color: 0x2e8b57 }, // Visible right away behind boat
+            { x: 25, z: -30, color: 0x8b4513 },
+            { x: -40, z: 15, color: 0x556b2f },
+            { x: 30, z: 40, color: 0x228b22 }
         ];
 
-        const geo = new THREE.CylinderGeometry(8, 12, 10, 8);
+        const geo = new THREE.CylinderGeometry(4, 6, 8, 8);
         
         positions.forEach(pos => {
             const mat = new THREE.MeshStandardMaterial({ color: pos.color, flatShading: true });

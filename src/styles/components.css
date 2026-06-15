@@ -50,14 +50,18 @@
 }
 
 .landing-title {
-  font-size: 4rem;
+  font-size: clamp(2.5rem, 10vw, 4rem);
   margin-bottom: 2rem;
   text-align: center;
+  padding: 0 1rem;
 }
 
 .landing-buttons {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 1rem;
+  padding: 0 1rem;
 }
 
 /* Exploring Mode Navigation Overlay */

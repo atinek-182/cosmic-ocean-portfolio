@@ -90,6 +90,12 @@
       "type": "harbor",
       "coordinates": { "x": 200, "z": 300 },
       "triggerRadius": 30
+    },
+    {
+      "id": "observatory",
+      "type": "observatory",
+      "coordinates": { "x": 300, "z": -100 },
+      "triggerRadius": 40
     }
   ]
 }

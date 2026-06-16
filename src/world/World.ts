@@ -4,7 +4,7 @@ import BoatController from './BoatController';
 import InteractionManager from './InteractionManager';
 import Islands from './Islands';
 import InputManager from '../core/InputManager';
-import { WORLD_RADIUS, DEBUG_WORLD } from '../core/Constants';
+import { WORLD_RADIUS, DEBUG_WORLD, DEBUG_OCEAN } from '../core/Constants';
 import { Assets } from '../core/AssetLoader';
 import oceanVertex from '../shaders/ocean/vertex.glsl?raw';
 import oceanFragment from '../shaders/ocean/fragment.glsl?raw';
@@ -35,12 +35,18 @@ export default class World {
             fragmentShader: oceanFragment,
             uniforms: {
                 uTime: { value: 0 },
+                uWaveHeight: { value: DEBUG_OCEAN ? 0.2 : 0.4 },
+                uWaveSpeed: { value: DEBUG_OCEAN ? 0.5 : 1.0 },
                 uDepthColor: { value: new THREE.Color(0x1e3f5a) },
                 uSurfaceColor: { value: new THREE.Color(0x4b8eb3) },
                 uColorOffset: { value: 0.1 },
                 uColorMultiplier: { value: 3.0 }
             }
         });
+        
+        if (DEBUG_OCEAN) {
+            console.log(`[Ocean] Shader initialized. Wave height and speed reduced by 50%.`);
+        }
         
         this.ocean = new THREE.Mesh(oceanGeo, oceanMat);
         this.app.scene.add(this.ocean);

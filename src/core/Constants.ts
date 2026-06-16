@@ -11,3 +11,4 @@ export const FOG_END_FACTOR = 0.9;
 // Debug configuration
 export const DEBUG_WORLD = true;
 export const DEBUG_CAMERA_DISTANCE = 1.5;
+export const DEBUG_OCEAN = true;

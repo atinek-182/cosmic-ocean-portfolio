@@ -54,12 +54,41 @@ export default class App {
             this.ui.showLoadingScreen();
 
             // Setup AssetLoader progress
+            let realProgress = 0;
             this.assetLoader.on('assetProgress', (progress: number) => {
-                this.ui.updateProgress(progress);
+                realProgress = progress;
             });
 
-            // 5. Load 3D Assets
-            const assets: Assets = await this.assetLoader.loadAll();
+            // 5. Load 3D Assets with guaranteed minimum 1.5s UX delay
+            const minDuration = 1500;
+            const startTime = performance.now();
+            let isLoaded = false;
+
+            const assetsPromise = this.assetLoader.loadAll().then(a => {
+                isLoaded = true;
+                return a;
+            });
+
+            await new Promise<void>(resolve => {
+                const interval = setInterval(() => {
+                    const elapsed = performance.now() - startTime;
+                    const guaranteedProgress = Math.min((elapsed / minDuration) * 100, 100);
+                    
+                    if (isLoaded && guaranteedProgress >= 100) {
+                        clearInterval(interval);
+                        this.ui.updateProgress(100);
+                        resolve();
+                    } else {
+                        // Display minimum of real vs guaranteed, but don't hit 100 prematurely
+                        const progress = isLoaded ? 
+                            Math.min(guaranteedProgress, 99) : 
+                            Math.min(Math.max(guaranteedProgress, realProgress), 99);
+                        this.ui.updateProgress(progress);
+                    }
+                }, 30);
+            });
+
+            const assets: Assets = await assetsPromise;
 
             // 6. Initialize World with assets
             this.world = new World(this, this.input, assets);

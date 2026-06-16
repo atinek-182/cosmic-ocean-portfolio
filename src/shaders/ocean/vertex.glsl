@@ -1,4 +1,6 @@
 uniform float uTime;
+uniform float uWaveHeight;
+uniform float uWaveSpeed;
 
 varying float vElevation;
 
@@ -6,8 +8,8 @@ void main() {
     vec4 modelPosition = modelMatrix * vec4(position, 1.0);
     
     // Simple sine wave displacement
-    float elevation = sin(modelPosition.x * 0.2 + uTime) * 
-                      sin(modelPosition.z * 0.2 + uTime) * 1.5;
+    float elevation = sin(modelPosition.x * 0.2 + uTime * uWaveSpeed) * 
+                      sin(modelPosition.z * 0.2 + uTime * uWaveSpeed) * uWaveHeight;
                       
     modelPosition.y += elevation;
     

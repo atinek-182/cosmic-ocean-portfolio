@@ -22,8 +22,8 @@ export default class AssetLoader extends EventEmitter {
                 const progress = (itemsLoaded / itemsTotal) * 100;
                 this.emit('assetProgress', progress);
             },
-            (url) => {
-                console.warn(`[AssetLoader] Error loading ${url}`);
+            (_url) => {
+                // Silenced to prevent duplicate warnings; we handle this in the catch block.
             }
         );
 
@@ -41,7 +41,7 @@ export default class AssetLoader extends EventEmitter {
             const boatGltf = await this.gltfLoader.loadAsync('/models/boat.glb');
             this.assets.boat = boatGltf.scene;
         } catch (error) {
-            console.warn("[AssetLoader] Failed to load /models/boat.glb. Injecting BoxGeometry fallback.");
+            console.warn("[AssetLoader] boat.glb missing. Using fallback.");
             const group = new THREE.Group();
             const geo = new THREE.BoxGeometry(2, 1, 4);
             const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
@@ -55,7 +55,7 @@ export default class AssetLoader extends EventEmitter {
             const islandGltf = await this.gltfLoader.loadAsync('/models/island.glb');
             this.assets.island = islandGltf.scene;
         } catch (error) {
-            console.warn("[AssetLoader] Failed to load /models/island.glb. Injecting CylinderGeometry fallback.");
+            console.warn("[AssetLoader] island.glb missing. Using fallback.");
             const group = new THREE.Group();
             const geo = new THREE.CylinderGeometry(15, 15, 2, 32);
             const mat = new THREE.MeshStandardMaterial({ color: 0x44aa44 });

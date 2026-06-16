@@ -6,8 +6,8 @@ uniform float uColorMultiplier;
 varying float vElevation;
 
 void main() {
-    // Mix colors based on elevation
-    float mixStrength = (vElevation + uColorOffset) * uColorMultiplier;
+    // Mix colors based on elevation, clamped to prevent extrapolation artifacts
+    float mixStrength = clamp((vElevation + uColorOffset) * uColorMultiplier, 0.0, 1.0);
     vec3 color = mix(uDepthColor, uSurfaceColor, mixStrength);
     
     // Add white foam at the very peaks

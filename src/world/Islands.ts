@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import App from '../core/App';
 import { DEBUG_WORLD } from '../core/Constants';
 
+import { Assets } from '../core/AssetLoader';
+
 export default class Islands {
     public mesh: THREE.Group;
     private app: App;
 
-    constructor(app: App) {
+    constructor(app: App, assets: Assets) {
         this.app = app;
         this.mesh = new THREE.Group();
 
@@ -21,28 +23,24 @@ export default class Islands {
                     else if (trigger.id === 'observatory') { x = 60; z = 20; }
                 }
 
-                this.createPlaceholder(x, z, trigger.triggerRadius, trigger.type, trigger.id);
+                this.createPlaceholder(x, z, trigger.triggerRadius, trigger.type, trigger.id, assets.island);
             });
         }
     }
 
-    private createPlaceholder(x: number, z: number, radius: number, type: string, id: string): void {
-        let color = 0xaaaaaa;
-        if (type === 'project') color = 0x44ff44;
-        else if (type === 'harbor') color = 0x4444ff;
-        else if (type === 'observatory') color = 0xff44ff;
-
-        let geo: THREE.BufferGeometry = new THREE.CylinderGeometry(radius * 0.5, radius * 0.8, 4, 16);
-        let mat = new THREE.MeshStandardMaterial({ color });
-
+    private createPlaceholder(x: number, z: number, radius: number, _type: string, id: string, islandAsset: THREE.Group): void {
+        let island: THREE.Object3D;
+        
         if (DEBUG_WORLD) {
-            color = 0xffff00; // Bright yellow
-            geo = new THREE.CylinderGeometry(4, 4, 8, 16);
-            mat = new THREE.MeshStandardMaterial({ color });
+            const geo = new THREE.CylinderGeometry(4, 4, 8, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffff00 });
+            island = new THREE.Mesh(geo, mat);
+            island.position.set(x, 4, z);
+        } else {
+            // Clone the injected GLB model (or its fallback)
+            island = islandAsset.clone();
+            island.position.set(x, 0, z); // Assume standard model sits at Y=0
         }
-
-        const island = new THREE.Mesh(geo, mat);
-        island.position.set(x, DEBUG_WORLD ? 4 : 2, z);
 
         // Debug visual for the trigger radius
         const radiusGeo = new THREE.RingGeometry(radius - 0.5, radius, 32);

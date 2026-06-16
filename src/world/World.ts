@@ -5,6 +5,9 @@ import InteractionManager from './InteractionManager';
 import Islands from './Islands';
 import InputManager from '../core/InputManager';
 import { WORLD_RADIUS, DEBUG_WORLD } from '../core/Constants';
+import { Assets } from '../core/AssetLoader';
+import oceanVertex from '../shaders/ocean/vertex.glsl?raw';
+import oceanFragment from '../shaders/ocean/fragment.glsl?raw';
 
 export default class World {
     public app: App;
@@ -20,22 +23,34 @@ export default class World {
     private lastLoggedVel: number = 0;
     private lastLoggedTrigger: string | null = null;
 
-    constructor(app: App, input: InputManager) {
+    constructor(app: App, input: InputManager, assets: Assets) {
         this.app = app;
 
         // Create massive placeholder ocean plane
-        const oceanGeo = new THREE.PlaneGeometry(WORLD_RADIUS * 4, WORLD_RADIUS * 4);
+        const oceanGeo = new THREE.PlaneGeometry(WORLD_RADIUS * 4, WORLD_RADIUS * 4, 128, 128); // Add subdivisions for waves
         oceanGeo.rotateX(-Math.PI * 0.5);
-        const oceanMat = new THREE.MeshBasicMaterial({ color: 0x1e3f5a });
+        
+        const oceanMat = new THREE.ShaderMaterial({
+            vertexShader: oceanVertex,
+            fragmentShader: oceanFragment,
+            uniforms: {
+                uTime: { value: 0 },
+                uDepthColor: { value: new THREE.Color(0x1e3f5a) },
+                uSurfaceColor: { value: new THREE.Color(0x4b8eb3) },
+                uColorOffset: { value: 0.1 },
+                uColorMultiplier: { value: 3.0 }
+            }
+        });
+        
         this.ocean = new THREE.Mesh(oceanGeo, oceanMat);
         this.app.scene.add(this.ocean);
 
         // Initialize boat
-        this.boat = new BoatController(input);
+        this.boat = new BoatController(input, assets.boat);
         this.app.scene.add(this.boat.mesh);
 
         // Initialize islands
-        this.islands = new Islands(app);
+        this.islands = new Islands(app, assets);
         this.app.scene.add(this.islands.mesh);
 
         // Initialize interaction manager
@@ -63,6 +78,9 @@ export default class World {
     public update(deltaTime: number): void {
         this.boat.update(deltaTime);
         this.interaction.update(this.boat.mesh.position);
+        
+        // Update Ocean Shader Time
+        (this.ocean.material as THREE.ShaderMaterial).uniforms.uTime.value = this.app.time.elapsed * 0.001;
 
         if (DEBUG_WORLD) {
             this.lastLogTime += deltaTime;

@@ -17,18 +17,11 @@ export default class BoatController {
     private rotationSpeed: number = 2.0;
     private rotationDampFactor: number = 10.0;
 
-    constructor(input: InputManager) {
+    constructor(input: InputManager, boatModel: THREE.Group) {
         this.input = input;
         
-        // Use a Group to easily replace with a GLB model later
-        this.mesh = new THREE.Group();
-
-        // Simple placeholder box for the boat
-        const geo = new THREE.BoxGeometry(2, 1, 4);
-        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-        const box = new THREE.Mesh(geo, mat);
-        box.position.y = 0.5; // Elevate so it sits on top of the ocean plane
-        this.mesh.add(box);
+        // Use the injected GLB model from AssetLoader
+        this.mesh = boatModel;
     }
 
     public update(deltaTime: number): void {

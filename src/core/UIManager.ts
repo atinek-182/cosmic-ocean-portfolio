@@ -19,6 +19,23 @@ export default class UIManager {
         this.container = container;
     }
 
+    public showLoadingScreen(): void {
+        this.setState(AppState.LOADING);
+        this.container.innerHTML = `
+            <div class="loading-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #0a0a2a; color: white;">
+                <h1>Loading Universe...</h1>
+                <p id="loading-progress">0%</p>
+            </div>
+        `;
+    }
+
+    public updateProgress(progress: number): void {
+        const progressEl = document.getElementById('loading-progress');
+        if (progressEl) {
+            progressEl.innerText = `${Math.round(progress)}%`;
+        }
+    }
+
     public showLandingScreen(): void {
         this.setState(AppState.LANDING);
         

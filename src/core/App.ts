@@ -9,6 +9,7 @@ import { AppState } from './AppState';
 import FeatureFlags from './FeatureFlags';
 import InputManager from './InputManager';
 import World from '../world/World';
+import AssetLoader, { Assets } from './AssetLoader';
 
 export default class App {
     public canvas: HTMLCanvasElement;
@@ -23,6 +24,7 @@ export default class App {
     public flags!: FeatureFlags;
     public input: InputManager;
     public world!: World;
+    public assetLoader: AssetLoader;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -36,6 +38,7 @@ export default class App {
         this.renderer = new Renderer(this);
         this.content = new ContentManager();
         this.input = new InputManager();
+        this.assetLoader = new AssetLoader();
 
         this.init();
     }
@@ -43,14 +46,23 @@ export default class App {
     private async init() {
         // 2. Load content.json
         // 3. Validate content
-        this.content.on('contentLoaded', () => {
+        this.content.on('contentLoaded', async () => {
             this.flags = new FeatureFlags(this.content.data?.featureFlags);
             
             // 4. Create UIManager
             this.ui = new UIManager(this);
+            this.ui.showLoadingScreen();
 
-            // 5. Initialize World
-            this.world = new World(this, this.input);
+            // Setup AssetLoader progress
+            this.assetLoader.on('assetProgress', (progress: number) => {
+                this.ui.updateProgress(progress);
+            });
+
+            // 5. Load 3D Assets
+            const assets: Assets = await this.assetLoader.loadAll();
+
+            // 6. Initialize World with assets
+            this.world = new World(this, this.input, assets);
 
             // Connect InteractionManager events to UI
             this.world.interaction.on('triggerEnter', (data) => {
@@ -63,7 +75,7 @@ export default class App {
                 if (this.ui) this.ui.hideInteractionPrompt();
             });
             
-            // 6. Show Landing Screen
+            // 7. Show Landing Screen
             this.ui.showLandingScreen();
 
             // Start loop only after UI is ready

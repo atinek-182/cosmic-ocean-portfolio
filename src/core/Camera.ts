@@ -40,6 +40,8 @@ export default class Camera {
 
     public resize(): void {
         const aspect = this.app.sizes.width / this.app.sizes.height;
+        // TODO: (Milestone 8) Evaluate mobile-specific orthographic frustum size/zoom offset.
+        // Mobile screens currently appear slightly too close to the boat compared to desktop.
         const frustumSize = 20;
 
         this.instance.left = (frustumSize * aspect) / -2;

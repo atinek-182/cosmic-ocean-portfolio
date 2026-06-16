@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import InputManager from '../core/InputManager';
 import { damp, clamp } from '../utils/mathUtils';
 
-const DEBUG_MODE = true;
-
 export default class BoatController {
     public mesh: THREE.Group;
     private input: InputManager;
@@ -18,9 +16,6 @@ export default class BoatController {
     private targetRotationY: number = 0;
     private rotationSpeed: number = 2.0;
     private rotationDampFactor: number = 10.0;
-
-    // Debug tracking
-    private lastLogTime: number = 0;
 
     constructor(input: InputManager) {
         this.input = input;
@@ -39,7 +34,6 @@ export default class BoatController {
     public update(deltaTime: number): void {
         this.updateRotation(deltaTime);
         this.updateMovement(deltaTime);
-        this.debugLog(deltaTime);
     }
 
     private updateRotation(deltaTime: number): void {
@@ -77,13 +71,7 @@ export default class BoatController {
         this.mesh.position.z += direction.z * this.velocity * deltaTime;
     }
 
-    private debugLog(deltaTime: number): void {
-        if (!DEBUG_MODE) return;
-
-        this.lastLogTime += deltaTime;
-        if (this.lastLogTime > 1.0) { // Log once per second
-            console.log(`[Boat] Pos: (${this.mesh.position.x.toFixed(1)}, ${this.mesh.position.z.toFixed(1)}) | Vel: ${this.velocity.toFixed(2)}`);
-            this.lastLogTime = 0;
-        }
+    public getVelocity(): number {
+        return this.velocity;
     }
 }

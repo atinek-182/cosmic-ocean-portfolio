@@ -13,6 +13,12 @@ export default class World {
     public islands: Islands;
     private ocean: THREE.Mesh;
     private lastLogTime: number = 0;
+    
+    // Debug logging state
+    private lastLoggedX: number = 0;
+    private lastLoggedZ: number = 0;
+    private lastLoggedVel: number = 0;
+    private lastLoggedTrigger: string | null = null;
 
     constructor(app: App, input: InputManager) {
         this.app = app;
@@ -61,10 +67,27 @@ export default class World {
         if (DEBUG_WORLD) {
             this.lastLogTime += deltaTime;
             if (this.lastLogTime > 1.0) {
-                console.log(`[Boat]\nPosition: ${this.boat.mesh.position.x.toFixed(1)}, ${this.boat.mesh.position.z.toFixed(1)}`);
-                if (this.interaction.nearestTriggerData) {
-                    console.log(`[Interaction]\nNearest Trigger: ${this.interaction.nearestTriggerData.id}\nDistance: ${this.interaction.nearestTriggerData.distance.toFixed(1)}`);
+                const currentX = this.boat.mesh.position.x;
+                const currentZ = this.boat.mesh.position.z;
+                const currentVel = this.boat.getVelocity();
+                const currentTrigger = this.interaction.nearestTriggerData?.id || null;
+
+                const posChanged = Math.abs(currentX - this.lastLoggedX) > 0.1 || Math.abs(currentZ - this.lastLoggedZ) > 0.1;
+                const velChanged = Math.abs(currentVel - this.lastLoggedVel) > 0.1;
+                const triggerChanged = currentTrigger !== this.lastLoggedTrigger;
+
+                if (posChanged || velChanged || triggerChanged) {
+                    console.log(`[Boat]\nPosition: ${currentX.toFixed(1)}, ${currentZ.toFixed(1)}`);
+                    if (this.interaction.nearestTriggerData) {
+                        console.log(`[Interaction]\nNearest Trigger: ${this.interaction.nearestTriggerData.id}\nDistance: ${this.interaction.nearestTriggerData.distance.toFixed(1)}`);
+                    }
+                    
+                    this.lastLoggedX = currentX;
+                    this.lastLoggedZ = currentZ;
+                    this.lastLoggedVel = currentVel;
+                    this.lastLoggedTrigger = currentTrigger;
                 }
+                
                 this.lastLogTime = 0;
             }
         }

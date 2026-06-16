@@ -10,7 +10,7 @@ export interface InteractionEventData {
 
 export default class InteractionManager extends EventEmitter {
     private app: App;
-    private activeTriggerId: string | null = null;
+    private activeTrigger: { id: string, type: string } | null = null;
     private triggers: Array<{
         id: string;
         type: string;
@@ -71,23 +71,23 @@ export default class InteractionManager extends EventEmitter {
 
         // State Machine logic to prevent event spam
         if (nearestTrigger) {
-            if (this.activeTriggerId !== nearestTrigger.id) {
+            if (this.activeTrigger?.id !== nearestTrigger.id) {
                 // If we were inside another trigger, exit it first
-                if (this.activeTriggerId !== null) {
-                    this.emit('triggerExit');
+                if (this.activeTrigger !== null) {
+                    this.emit('triggerExit', this.activeTrigger);
                 }
 
-                this.activeTriggerId = nearestTrigger.id;
-                this.emit('triggerEnter', {
+                this.activeTrigger = {
                     id: nearestTrigger.id,
                     type: nearestTrigger.type
-                });
+                };
+                this.emit('triggerEnter', this.activeTrigger);
             }
         } else {
             // No trigger nearby
-            if (this.activeTriggerId !== null) {
-                this.activeTriggerId = null;
-                this.emit('triggerExit');
+            if (this.activeTrigger !== null) {
+                this.emit('triggerExit', this.activeTrigger);
+                this.activeTrigger = null;
             }
         }
     }

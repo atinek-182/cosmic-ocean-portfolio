@@ -58,8 +58,8 @@ export default class App {
                 if (this.ui) this.ui.showInteractionPrompt(data);
             });
 
-            this.world.interaction.on('triggerExit', () => {
-                console.log(`[Interaction] Exit Trigger`);
+            this.world.interaction.on('triggerExit', (data) => {
+                console.log(`[Interaction] Exit Trigger: ${data.id} (${data.type})`);
                 if (this.ui) this.ui.hideInteractionPrompt();
             });
             

@@ -7,6 +7,8 @@ import ContentManager from './ContentManager';
 import UIManager from './UIManager';
 import { AppState } from './AppState';
 import FeatureFlags from './FeatureFlags';
+import InputManager from './InputManager';
+import World from '../world/World';
 
 export default class App {
     public canvas: HTMLCanvasElement;
@@ -19,6 +21,8 @@ export default class App {
     public content: ContentManager;
     public ui!: UIManager;
     public flags!: FeatureFlags;
+    public input: InputManager;
+    public world!: World;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -31,6 +35,7 @@ export default class App {
         this.camera = new Camera(this);
         this.renderer = new Renderer(this);
         this.content = new ContentManager();
+        this.input = new InputManager();
 
         this.init();
     }
@@ -43,8 +48,11 @@ export default class App {
             
             // 4. Create UIManager
             this.ui = new UIManager(this);
+
+            // 5. Initialize World
+            this.world = new World(this, this.input);
             
-            // 5. Show Landing Screen
+            // 6. Show Landing Screen
             this.ui.showLandingScreen();
 
             // Start loop only after UI is ready
@@ -68,7 +76,16 @@ export default class App {
             return;
         }
 
-        this.camera.update();
+        const deltaTime = this.time.delta * 0.001; // Convert to seconds
+
+        // Update world physics/logic
+        if (this.world) {
+            this.world.update(deltaTime);
+            this.camera.updateFollow(this.world.boat.mesh.position, deltaTime);
+        } else {
+            this.camera.update();
+        }
+
         this.renderer.update();
     }
 }

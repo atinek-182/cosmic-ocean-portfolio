@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import App from './App';
 import { damp } from '../utils/mathUtils';
+import { DEBUG_WORLD, DEBUG_CAMERA_DISTANCE } from './Constants';
 
 export default class Camera {
     public app: App;
@@ -13,7 +14,8 @@ export default class Camera {
         this.app = app;
         
         const aspect = this.app.sizes.width / this.app.sizes.height;
-        const frustumSize = 20;
+        let frustumSize = 20;
+        if (DEBUG_WORLD) frustumSize *= DEBUG_CAMERA_DISTANCE;
         
         // Orthographic Camera locked at isometric angle per TAD
         this.instance = new THREE.OrthographicCamera(
@@ -27,6 +29,10 @@ export default class Camera {
 
         this.targetPosition = new THREE.Vector3(0, 0, 0);
         this.offset = new THREE.Vector3(20, 20, 20); // Maintain isometric offset
+        
+        if (DEBUG_WORLD) {
+            this.offset.multiplyScalar(DEBUG_CAMERA_DISTANCE);
+        }
 
         this.instance.position.copy(this.targetPosition).add(this.offset);
         this.instance.lookAt(this.targetPosition);
@@ -39,11 +45,13 @@ export default class Camera {
     }
 
     public resize(): void {
-        const aspect = this.app.sizes.width / this.app.sizes.height;
+        // Camera only acts as a framing tool, derived from world scale
         // TODO: (Milestone 8) Evaluate mobile-specific orthographic frustum size/zoom offset.
         // Mobile screens currently appear slightly too close to the boat compared to desktop.
-        const frustumSize = 20;
+        let frustumSize = 20;
+        if (DEBUG_WORLD) frustumSize *= DEBUG_CAMERA_DISTANCE;
 
+        const aspect = this.app.sizes.width / this.app.sizes.height;
         this.instance.left = (frustumSize * aspect) / -2;
         this.instance.right = (frustumSize * aspect) / 2;
         this.instance.top = frustumSize / 2;

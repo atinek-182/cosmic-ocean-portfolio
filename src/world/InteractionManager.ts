@@ -1,6 +1,7 @@
 import EventEmitter from 'eventemitter3';
 import * as THREE from 'three';
 import App from '../core/App';
+import { DEBUG_WORLD } from '../core/Constants';
 
 export interface InteractionEventData {
     id: string;
@@ -17,6 +18,7 @@ export default class InteractionManager extends EventEmitter {
         z: number;
         radius: number;
     }> = [];
+    public nearestTriggerData: { id: string, distance: number } | null = null;
 
     constructor(app: App) {
         super();
@@ -24,13 +26,24 @@ export default class InteractionManager extends EventEmitter {
 
         // Parse triggers from validated content.json
         if (this.app.content.data?.worldTriggers) {
-            this.triggers = this.app.content.data.worldTriggers.map(trigger => ({
-                id: trigger.id,
-                type: trigger.type,
-                x: trigger.coordinates.x,
-                z: trigger.coordinates.z,
-                radius: trigger.triggerRadius
-            }));
+            this.triggers = this.app.content.data.worldTriggers.map(trigger => {
+                let x = trigger.coordinates.x;
+                let z = trigger.coordinates.z;
+
+                if (DEBUG_WORLD) {
+                    if (trigger.id === 'project-alpha') { x = 20; z = 20; }
+                    else if (trigger.id === 'harbor') { x = 40; z = 40; }
+                    else if (trigger.id === 'observatory') { x = 60; z = 20; }
+                }
+
+                return {
+                    id: trigger.id,
+                    type: trigger.type,
+                    x,
+                    z,
+                    radius: trigger.triggerRadius
+                };
+            });
         }
     }
 
@@ -48,6 +61,12 @@ export default class InteractionManager extends EventEmitter {
                 minDistance = distance;
                 nearestTrigger = trigger;
             }
+        }
+
+        if (nearestTrigger) {
+            this.nearestTriggerData = { id: nearestTrigger.id, distance: minDistance };
+        } else {
+            this.nearestTriggerData = null;
         }
 
         // State Machine logic to prevent event spam

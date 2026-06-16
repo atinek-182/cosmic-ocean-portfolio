@@ -51,6 +51,17 @@ export default class App {
 
             // 5. Initialize World
             this.world = new World(this, this.input);
+
+            // Connect InteractionManager events to UI
+            this.world.interaction.on('triggerEnter', (data) => {
+                console.log(`[Interaction] Enter Trigger: ${data.id} (${data.type})`);
+                if (this.ui) this.ui.showInteractionPrompt(data);
+            });
+
+            this.world.interaction.on('triggerExit', () => {
+                console.log(`[Interaction] Exit Trigger`);
+                if (this.ui) this.ui.hideInteractionPrompt();
+            });
             
             // 6. Show Landing Screen
             this.ui.showLandingScreen();

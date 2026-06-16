@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import App from '../core/App';
 import BoatController from './BoatController';
+import InteractionManager from './InteractionManager';
+import Islands from './Islands';
 import InputManager from '../core/InputManager';
 import { WORLD_RADIUS } from '../core/Constants';
 
 export default class World {
     public app: App;
     public boat: BoatController;
+    public interaction: InteractionManager;
+    public islands: Islands;
     private ocean: THREE.Mesh;
 
     constructor(app: App, input: InputManager) {
@@ -23,6 +27,13 @@ export default class World {
         this.boat = new BoatController(input);
         this.app.scene.add(this.boat.mesh);
 
+        // Initialize islands
+        this.islands = new Islands(app);
+        this.app.scene.add(this.islands.mesh);
+
+        // Initialize interaction manager
+        this.interaction = new InteractionManager(app);
+
         // Basic lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -32,5 +43,6 @@ export default class World {
 
     public update(deltaTime: number): void {
         this.boat.update(deltaTime);
+        this.interaction.update(this.boat.mesh.position);
     }
 }

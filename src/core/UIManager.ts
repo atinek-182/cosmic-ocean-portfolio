@@ -5,6 +5,7 @@ export default class UIManager {
     public app: App;
     private container: HTMLElement;
     public currentState: AppState = AppState.LOADING;
+    private interactionElement: HTMLElement | null = null;
 
     constructor(app: App) {
         this.app = app;
@@ -144,6 +145,35 @@ export default class UIManager {
                 </ul>
             </div>
         `;
+    }
+
+    public showInteractionPrompt(data: { id: string, type: string }): void {
+        if (!this.interactionElement) {
+            this.interactionElement = document.createElement('div');
+            this.interactionElement.className = 'interaction-prompt';
+            this.interactionElement.style.position = 'absolute';
+            this.interactionElement.style.bottom = '20%';
+            this.interactionElement.style.left = '50%';
+            this.interactionElement.style.transform = 'translateX(-50%)';
+            this.interactionElement.style.padding = '10px 20px';
+            this.interactionElement.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+            this.interactionElement.style.color = 'white';
+            this.interactionElement.style.borderRadius = '8px';
+            this.interactionElement.style.textAlign = 'center';
+            this.container.appendChild(this.interactionElement);
+        }
+        
+        this.interactionElement.innerHTML = `
+            <p style="margin: 0; font-weight: bold;">Press Enter to Interact</p>
+            <p style="margin: 5px 0 0 0; font-size: 12px;">Trigger: ${data.id} (${data.type})</p>
+        `;
+        this.interactionElement.style.display = 'block';
+    }
+
+    public hideInteractionPrompt(): void {
+        if (this.interactionElement) {
+            this.interactionElement.style.display = 'none';
+        }
     }
 
     private setState(newState: AppState): void {

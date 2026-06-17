@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import EventEmitter from 'eventemitter3';
 
 export interface Assets {
@@ -10,6 +11,7 @@ export interface Assets {
 export default class AssetLoader extends EventEmitter {
     private loadingManager: THREE.LoadingManager;
     private gltfLoader: GLTFLoader;
+    private dracoLoader: DRACOLoader;
     public assets: Assets;
 
     constructor() {
@@ -28,6 +30,10 @@ export default class AssetLoader extends EventEmitter {
         );
 
         this.gltfLoader = new GLTFLoader(this.loadingManager);
+        
+        this.dracoLoader = new DRACOLoader(this.loadingManager);
+        this.dracoLoader.setDecoderPath('/draco/');
+        this.gltfLoader.setDRACOLoader(this.dracoLoader);
         
         // Initialize with null, will be populated
         this.assets = {

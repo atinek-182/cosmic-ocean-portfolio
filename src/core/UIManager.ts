@@ -6,6 +6,7 @@ export default class UIManager {
     private container: HTMLElement;
     public currentState: AppState = AppState.LOADING;
     private interactionElement: HTMLElement | null = null;
+    private activePrompts: Array<{ id: string, type: string }> = [];
 
     constructor(app: App) {
         this.app = app;
@@ -63,6 +64,11 @@ export default class UIManager {
         this.container.innerHTML = `
             <div class="overlay-nav">
                 <button id="btn-view-resume" class="btn btn-outline" tabindex="0">View Resume</button>
+            </div>
+            <div id="hud-container" style="position: absolute; top: 20px; right: 20px; text-align: right; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; font-family: monospace;">
+                <div>Islands: <span id="hud-islands">0/0</span></div>
+                <div>Stars: <span id="hud-stars">0/0</span></div>
+                <div>Completion: <span id="hud-percent">0</span>%</div>
             </div>
         `;
         document.getElementById('btn-view-resume')?.addEventListener('click', () => {
@@ -164,7 +170,44 @@ export default class UIManager {
         `;
     }
 
+    public updateHUD(data: { islands: number, totalIslands: number, collectibles: number, totalCollectibles: number, percentage: number }): void {
+        const islandsEl = document.getElementById('hud-islands');
+        const starsEl = document.getElementById('hud-stars');
+        const percentEl = document.getElementById('hud-percent');
+
+        if (islandsEl) islandsEl.innerText = `${data.islands}/${data.totalIslands}`;
+        if (starsEl) starsEl.innerText = `${data.collectibles}/${data.totalCollectibles}`;
+        if (percentEl) percentEl.innerText = `${Math.round(data.percentage)}`;
+    }
+
     public showInteractionPrompt(data: { id: string, type: string }): void {
+        // Add to stack if not present
+        if (!this.activePrompts.find(p => p.id === data.id)) {
+            this.activePrompts.push(data);
+        }
+        this.renderTopPrompt();
+    }
+
+    public hideInteractionPrompt(id: string): void {
+        this.activePrompts = this.activePrompts.filter(p => p.id !== id);
+        this.renderTopPrompt();
+    }
+
+    private renderTopPrompt(): void {
+        if (this.activePrompts.length === 0) {
+            if (this.interactionElement) this.interactionElement.style.display = 'none';
+            return;
+        }
+
+        // Priority: Islands > Collectibles
+        this.activePrompts.sort((a, b) => {
+            if (a.type !== 'collectible' && b.type === 'collectible') return -1;
+            if (a.type === 'collectible' && b.type !== 'collectible') return 1;
+            return 0;
+        });
+
+        const topPrompt = this.activePrompts[0];
+
         if (!this.interactionElement) {
             this.interactionElement = document.createElement('div');
             this.interactionElement.className = 'interaction-prompt';
@@ -180,17 +223,16 @@ export default class UIManager {
             this.container.appendChild(this.interactionElement);
         }
         
+        let message = 'Press Enter to Interact';
+        if (topPrompt.type === 'collectible') {
+            message = 'Press Enter to Collect';
+        }
+
         this.interactionElement.innerHTML = `
-            <p style="margin: 0; font-weight: bold;">Press Enter to Interact</p>
-            <p style="margin: 5px 0 0 0; font-size: 12px;">Trigger: ${data.id} (${data.type})</p>
+            <p style="margin: 0; font-weight: bold;">${message}</p>
+            <p style="margin: 5px 0 0 0; font-size: 12px;">Trigger: ${topPrompt.id} (${topPrompt.type})</p>
         `;
         this.interactionElement.style.display = 'block';
-    }
-
-    public hideInteractionPrompt(): void {
-        if (this.interactionElement) {
-            this.interactionElement.style.display = 'none';
-        }
     }
 
     private setState(newState: AppState): void {

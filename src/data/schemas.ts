@@ -63,7 +63,7 @@ export const TimelineEventSchema = z.object({
 
 export const WorldTriggerSchema = z.object({
     id: z.string(),
-    type: z.enum(["project", "harbor", "observatory", "reef"]),
+    type: z.enum(["project", "harbor", "observatory", "reef", "collectible"]),
     coordinates: z.object({
         x: z.number(),
         z: z.number()
@@ -105,3 +105,11 @@ export const PortfolioDataSchema = z.object({
 });
 
 export type PortfolioData = z.infer<typeof PortfolioDataSchema>;
+
+export const SaveDataSchema = z.object({
+    version: z.number(),
+    discoveredIslands: z.array(z.string()),
+    collectedItems: z.array(z.string())
+});
+
+export type SaveData = z.infer<typeof SaveDataSchema>;

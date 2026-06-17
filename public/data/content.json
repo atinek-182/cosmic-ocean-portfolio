@@ -96,6 +96,18 @@
       "type": "observatory",
       "coordinates": { "x": 300, "z": -100 },
       "triggerRadius": 40
+    },
+    {
+      "id": "star-1",
+      "type": "collectible",
+      "coordinates": { "x": 25, "z": 25 },
+      "triggerRadius": 5
+    },
+    {
+      "id": "star-2",
+      "type": "collectible",
+      "coordinates": { "x": 35, "z": 45 },
+      "triggerRadius": 5
     }
   ]
 }

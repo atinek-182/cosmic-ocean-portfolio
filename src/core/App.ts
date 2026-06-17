@@ -10,6 +10,7 @@ import FeatureFlags from './FeatureFlags';
 import InputManager from './InputManager';
 import World from '../world/World';
 import AssetLoader, { Assets } from './AssetLoader';
+import ProgressManager from './ProgressManager';
 
 export default class App {
     public canvas: HTMLCanvasElement;
@@ -25,6 +26,7 @@ export default class App {
     public input: InputManager;
     public world!: World;
     public assetLoader: AssetLoader;
+    public progress: ProgressManager;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -39,6 +41,7 @@ export default class App {
         this.content = new ContentManager();
         this.input = new InputManager();
         this.assetLoader = new AssetLoader();
+        this.progress = new ProgressManager();
 
         this.init();
     }
@@ -101,7 +104,38 @@ export default class App {
 
             this.world.interaction.on('triggerExit', (data) => {
                 console.log(`[Interaction] Exit Trigger: ${data.id} (${data.type})`);
-                if (this.ui) this.ui.hideInteractionPrompt();
+                if (this.ui) this.ui.hideInteractionPrompt(data.id);
+            });
+
+            // Initialize Progress tracking
+            this.progress.initTotals(this.content.data?.worldTriggers || []);
+            this.progress.on('progressUpdated', (state) => {
+                if (this.ui) this.ui.updateHUD(state);
+            });
+
+            // Handle Interaction Keypress
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && this.ui && this.ui.currentState === AppState.EXPLORING) {
+                    const activeTriggers = this.world.interaction.getActiveTriggers();
+                    if (activeTriggers.length === 0) return;
+
+                    // Priority: Islands > Collectibles
+                    activeTriggers.sort((a, b) => {
+                        if (a.type !== 'collectible' && b.type === 'collectible') return -1;
+                        if (a.type === 'collectible' && b.type !== 'collectible') return 1;
+                        return 0;
+                    });
+
+                    const target = activeTriggers[0];
+                    if (target.type === 'collectible') {
+                        this.progress.collectItem(target.id);
+                    } else {
+                        this.progress.discoverIsland(target.id);
+                        if (target.type === 'resume-island' || target.type === 'project' || target.type === 'harbor' || target.type === 'observatory') {
+                            this.ui.openResumeMode();
+                        }
+                    }
+                }
             });
             
             // 7. Show Landing Screen

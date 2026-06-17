@@ -10,7 +10,7 @@ export interface InteractionEventData {
 
 export default class InteractionManager extends EventEmitter {
     private app: App;
-    private activeTrigger: { id: string, type: string } | null = null;
+    private activeTriggers: Map<string, InteractionEventData> = new Map();
     private triggers: Array<{
         id: string;
         type: string;
@@ -19,6 +19,10 @@ export default class InteractionManager extends EventEmitter {
         radius: number;
     }> = [];
     public nearestTriggerData: { id: string, distance: number } | null = null;
+
+    public getActiveTriggers(): InteractionEventData[] {
+        return Array.from(this.activeTriggers.values());
+    }
 
     constructor(app: App) {
         super();
@@ -48,47 +52,42 @@ export default class InteractionManager extends EventEmitter {
     }
 
     public update(boatPosition: THREE.Vector3): void {
-        let nearestTrigger = null;
         let minDistance = Infinity;
+        let nearestId: string | null = null;
 
-        // Find the nearest trigger
+        // Process all triggers independently
         for (const trigger of this.triggers) {
             const dx = boatPosition.x - trigger.x;
             const dz = boatPosition.z - trigger.z;
             const distance = Math.hypot(dx, dz);
-
-            if (distance <= trigger.radius && distance < minDistance) {
+            
+            // Track nearest for global nearestTriggerData (preserves backwards compat)
+            if (distance < minDistance) {
                 minDistance = distance;
-                nearestTrigger = trigger;
+                nearestId = trigger.id;
             }
+
+            const isCurrentlyActive = this.activeTriggers.has(trigger.id);
+            const hysteresisBuffer = 0.5;
+
+            if (!isCurrentlyActive && distance <= trigger.radius) {
+                // State Transition: Outside -> Inside
+                const data: InteractionEventData = { id: trigger.id, type: trigger.type };
+                this.activeTriggers.set(trigger.id, data);
+                this.emit('triggerEnter', data);
+            } else if (isCurrentlyActive && distance > (trigger.radius + hysteresisBuffer)) {
+                // State Transition: Inside -> Outside
+                const data = this.activeTriggers.get(trigger.id)!;
+                this.activeTriggers.delete(trigger.id);
+                this.emit('triggerExit', data);
+            }
+            // State Inside->Inside and Outside->Outside do nothing.
         }
 
-        if (nearestTrigger) {
-            this.nearestTriggerData = { id: nearestTrigger.id, distance: minDistance };
+        if (nearestId !== null) {
+            this.nearestTriggerData = { id: nearestId, distance: minDistance };
         } else {
             this.nearestTriggerData = null;
-        }
-
-        // State Machine logic to prevent event spam
-        if (nearestTrigger) {
-            if (this.activeTrigger?.id !== nearestTrigger.id) {
-                // If we were inside another trigger, exit it first
-                if (this.activeTrigger !== null) {
-                    this.emit('triggerExit', this.activeTrigger);
-                }
-
-                this.activeTrigger = {
-                    id: nearestTrigger.id,
-                    type: nearestTrigger.type
-                };
-                this.emit('triggerEnter', this.activeTrigger);
-            }
-        } else {
-            // No trigger nearby
-            if (this.activeTrigger !== null) {
-                this.emit('triggerExit', this.activeTrigger);
-                this.activeTrigger = null;
-            }
         }
     }
 }

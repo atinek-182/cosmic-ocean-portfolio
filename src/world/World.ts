@@ -3,6 +3,7 @@ import App from '../core/App';
 import BoatController from './BoatController';
 import InteractionManager from './InteractionManager';
 import Islands from './Islands';
+import Collectibles from './Collectibles';
 import InputManager from '../core/InputManager';
 import { WORLD_RADIUS, DEBUG_WORLD, DEBUG_OCEAN } from '../core/Constants';
 import { Assets } from '../core/AssetLoader';
@@ -14,6 +15,7 @@ export default class World {
     public boat: BoatController;
     public interaction: InteractionManager;
     public islands: Islands;
+    public collectibles: Collectibles;
     private ocean: THREE.Mesh;
     private lastLogTime: number = 0;
     
@@ -59,6 +61,10 @@ export default class World {
         this.islands = new Islands(app, assets);
         this.app.scene.add(this.islands.mesh);
 
+        // Initialize collectibles
+        this.collectibles = new Collectibles(app);
+        this.app.scene.add(this.collectibles.mesh);
+
         // Initialize interaction manager
         this.interaction = new InteractionManager(app);
 
@@ -84,6 +90,7 @@ export default class World {
     public update(deltaTime: number): void {
         this.boat.update(deltaTime);
         this.interaction.update(this.boat.mesh.position);
+        this.collectibles.update(deltaTime, this.app.time.elapsed * 0.001);
         
         // Update Ocean Shader Time
         (this.ocean.material as THREE.ShaderMaterial).uniforms.uTime.value = this.app.time.elapsed * 0.001;

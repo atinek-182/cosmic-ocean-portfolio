@@ -32,7 +32,7 @@ export default class AssetLoader extends EventEmitter {
         this.gltfLoader = new GLTFLoader(this.loadingManager);
         
         this.dracoLoader = new DRACOLoader(this.loadingManager);
-        this.dracoLoader.setDecoderPath('/draco/');
+        this.dracoLoader.setDecoderPath(`${import.meta.env.BASE_URL}draco/`);
         this.gltfLoader.setDRACOLoader(this.dracoLoader);
         
         // Initialize with null, will be populated
@@ -43,8 +43,9 @@ export default class AssetLoader extends EventEmitter {
     }
 
     public async loadAll(): Promise<Assets> {
+        const baseUrl = import.meta.env.BASE_URL;
         try {
-            const boatGltf = await this.gltfLoader.loadAsync('/models/boat.glb');
+            const boatGltf = await this.gltfLoader.loadAsync(`${baseUrl}models/boat.glb`);
             this.assets.boat = boatGltf.scene;
         } catch (error) {
             console.warn("[AssetLoader] boat.glb missing. Using fallback.");
@@ -58,7 +59,7 @@ export default class AssetLoader extends EventEmitter {
         }
 
         try {
-            const islandGltf = await this.gltfLoader.loadAsync('/models/island.glb');
+            const islandGltf = await this.gltfLoader.loadAsync(`${baseUrl}models/island.glb`);
             this.assets.island = islandGltf.scene;
         } catch (error) {
             console.warn("[AssetLoader] island.glb missing. Using fallback.");

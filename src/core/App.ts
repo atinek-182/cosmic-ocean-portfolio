@@ -116,17 +116,22 @@ export default class App {
             // Handle Interaction Keypress
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && this.ui && this.ui.currentState === AppState.EXPLORING) {
-                    const activeTriggers = this.world.interaction.getActiveTriggers();
-                    if (activeTriggers.length === 0) return;
+                    let validTriggers = this.world.interaction.getActiveTriggers();
+                    validTriggers = validTriggers.filter(t => {
+                        if (t.type === 'collectible' && this.progress.hasCollectedItem(t.id)) return false;
+                        return true;
+                    });
+                    
+                    if (validTriggers.length === 0) return;
 
-                    // Priority: Islands > Collectibles
-                    activeTriggers.sort((a, b) => {
-                        if (a.type !== 'collectible' && b.type === 'collectible') return -1;
-                        if (a.type === 'collectible' && b.type !== 'collectible') return 1;
+                    // Priority: Collectibles > Islands
+                    validTriggers.sort((a, b) => {
+                        if (a.type === 'collectible' && b.type !== 'collectible') return -1;
+                        if (a.type !== 'collectible' && b.type === 'collectible') return 1;
                         return 0;
                     });
 
-                    const target = activeTriggers[0];
+                    const target = validTriggers[0];
                     if (target.type === 'collectible') {
                         this.progress.collectItem(target.id);
                     } else {

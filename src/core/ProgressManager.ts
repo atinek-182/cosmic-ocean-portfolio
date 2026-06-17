@@ -31,6 +31,10 @@ export default class ProgressManager extends EventEmitter {
         this.emitState();
     }
 
+    public refreshState(): void {
+        this.emitState();
+    }
+
     public discoverIsland(id: string): void {
         if (!this.discoveredIslands.has(id)) {
             this.discoveredIslands.add(id);

@@ -65,7 +65,7 @@ export default class UIManager {
             <div class="overlay-nav">
                 <button id="btn-view-resume" class="btn btn-outline" tabindex="0">View Resume</button>
             </div>
-            <div id="hud-container" style="position: absolute; top: 20px; right: 20px; text-align: right; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; font-family: monospace;">
+            <div id="hud-container" style="position: absolute; top: 60px; right: 20px; text-align: right; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; font-family: monospace;">
                 <div>Islands: <span id="hud-islands">0/0</span></div>
                 <div>Stars: <span id="hud-stars">0/0</span></div>
                 <div>Completion: <span id="hud-percent">0</span>%</div>
@@ -74,6 +74,9 @@ export default class UIManager {
         document.getElementById('btn-view-resume')?.addEventListener('click', () => {
             this.openResumeMode();
         });
+
+        // Force a HUD refresh immediately after creating the DOM elements
+        this.app.progress.refreshState();
     }
 
     public openResumeMode(): void {
@@ -194,19 +197,25 @@ export default class UIManager {
     }
 
     private renderTopPrompt(): void {
-        if (this.activePrompts.length === 0) {
+        // Filter out items that are already collected so their prompts disappear permanently
+        const validPrompts = this.activePrompts.filter(p => {
+            if (p.type === 'collectible' && this.app.progress.hasCollectedItem(p.id)) return false;
+            return true;
+        });
+
+        if (validPrompts.length === 0) {
             if (this.interactionElement) this.interactionElement.style.display = 'none';
             return;
         }
 
-        // Priority: Islands > Collectibles
-        this.activePrompts.sort((a, b) => {
-            if (a.type !== 'collectible' && b.type === 'collectible') return -1;
-            if (a.type === 'collectible' && b.type !== 'collectible') return 1;
+        // Priority: Collectibles > Islands (since collectibles are small and temporary)
+        validPrompts.sort((a, b) => {
+            if (a.type === 'collectible' && b.type !== 'collectible') return -1;
+            if (a.type !== 'collectible' && b.type === 'collectible') return 1;
             return 0;
         });
 
-        const topPrompt = this.activePrompts[0];
+        const topPrompt = validPrompts[0];
 
         if (!this.interactionElement) {
             this.interactionElement = document.createElement('div');

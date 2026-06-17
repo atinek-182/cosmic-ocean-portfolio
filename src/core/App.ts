@@ -124,16 +124,17 @@ export default class App {
                     
                     if (validTriggers.length === 0) return;
 
-                    // Priority: Collectibles > Islands
+                    // Priority: Islands > Collectibles
                     validTriggers.sort((a, b) => {
-                        if (a.type === 'collectible' && b.type !== 'collectible') return -1;
-                        if (a.type !== 'collectible' && b.type === 'collectible') return 1;
+                        if (a.type !== 'collectible' && b.type === 'collectible') return -1;
+                        if (a.type === 'collectible' && b.type !== 'collectible') return 1;
                         return 0;
                     });
 
                     const target = validTriggers[0];
                     if (target.type === 'collectible') {
                         this.progress.collectItem(target.id);
+                        this.ui.hideInteractionPrompt(target.id);
                     } else {
                         this.progress.discoverIsland(target.id);
                         if (target.type === 'resume-island' || target.type === 'project' || target.type === 'harbor' || target.type === 'observatory') {

@@ -65,7 +65,7 @@ export default class UIManager {
             <div class="overlay-nav">
                 <button id="btn-view-resume" class="btn btn-outline" tabindex="0">View Resume</button>
             </div>
-            <div id="hud-container" style="position: absolute; top: 60px; right: 20px; text-align: right; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; font-family: monospace;">
+            <div id="hud-container" style="position: absolute; top: 100px; right: 20px; text-align: right; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; font-family: monospace;">
                 <div>Islands: <span id="hud-islands">0/0</span></div>
                 <div>Stars: <span id="hud-stars">0/0</span></div>
                 <div>Completion: <span id="hud-percent">0</span>%</div>
@@ -208,10 +208,10 @@ export default class UIManager {
             return;
         }
 
-        // Priority: Collectibles > Islands (since collectibles are small and temporary)
+        // Priority: Islands > Collectibles
         validPrompts.sort((a, b) => {
-            if (a.type === 'collectible' && b.type !== 'collectible') return -1;
-            if (a.type !== 'collectible' && b.type === 'collectible') return 1;
+            if (a.type !== 'collectible' && b.type === 'collectible') return -1;
+            if (a.type === 'collectible' && b.type !== 'collectible') return 1;
             return 0;
         });
 

@@ -100,13 +100,13 @@
     {
       "id": "star-1",
       "type": "collectible",
-      "coordinates": { "x": 25, "z": 25 },
+      "coordinates": { "x": 0, "z": 50 },
       "triggerRadius": 5
     },
     {
       "id": "star-2",
       "type": "collectible",
-      "coordinates": { "x": 35, "z": 45 },
+      "coordinates": { "x": -20, "z": -20 },
       "triggerRadius": 5
     }
   ]
